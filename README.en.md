@@ -117,6 +117,14 @@ The two processes communicate through `DistributedNotificationCenter`. Configura
 3. Launch RClickX and follow onboarding to enable the Finder extension.
 4. Add the folders where file actions should be allowed.
 
+### First-launch security warning
+
+When you first download and open the app from GitHub, macOS may show **“Cannot verify the developer”** or block the app from opening. This is Gatekeeper's security check for downloaded apps. Continue with these steps:
+
+1. Open **System Settings → Privacy & Security**.
+2. In the **Security** section, click **Open Anyway**.
+3. Confirm once more in the dialog that appears.
+
 The exact System Settings labels vary by macOS release. On macOS 26/27, the extension is usually under **System Settings → General → Login Items & Extensions → Extensions → Finder**; older releases use **Privacy & Security → Extensions → Finder Extensions**. After a folder is authorized once, RClickX stores a security-scoped bookmark for later operations.
 
 ### Homebrew Cask
