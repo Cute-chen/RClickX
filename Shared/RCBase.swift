@@ -48,7 +48,6 @@ extension OpenWithApp {
     }
 
     static var vscode: OpenWithApp? {
-        // 尝试多个 VS Code 变体的 bundle identifier
         let identifiers = [
             "com.microsoft.VSCode",
             "com.microsoft.VSCodeInsiders",
@@ -57,7 +56,6 @@ extension OpenWithApp {
            let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: id) {
             return OpenWithApp(appURL: url)
         }
-        // 回退：搜索常见路径
         let commonPaths = [
             "/Applications/Visual Studio Code.app",
             "/Applications/Visual Studio Code - Insiders.app",
@@ -70,12 +68,110 @@ extension OpenWithApp {
         }
         return nil
     }
+
+    static var cursor: OpenWithApp? {
+        let identifiers = [
+            "com.todesktop.230313mzl4w4u92",
+            "com.todesktop.230313mzl4w4u92.helper",
+        ]
+        if let id = identifiers.first(where: { NSWorkspace.shared.urlForApplication(withBundleIdentifier: $0) != nil }),
+           let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: id) {
+            return OpenWithApp(appURL: url)
+        }
+        let commonPaths = [
+            "/Applications/Cursor.app",
+            NSHomeDirectory() + "/Applications/Cursor.app",
+        ]
+        for path in commonPaths {
+            if FileManager.default.fileExists(atPath: path) {
+                return OpenWithApp(appURL: URL(fileURLWithPath: path))
+            }
+        }
+        return nil
+    }
+
+    static var iterm2: OpenWithApp? {
+        if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.googlecode.iterm2") {
+            return OpenWithApp(appURL: url)
+        }
+        let commonPaths = [
+            "/Applications/iTerm.app",
+            "/Applications/iTerm2.app",
+            NSHomeDirectory() + "/Applications/iTerm.app",
+            NSHomeDirectory() + "/Applications/iTerm2.app",
+        ]
+        for path in commonPaths {
+            if FileManager.default.fileExists(atPath: path) {
+                return OpenWithApp(appURL: URL(fileURLWithPath: path))
+            }
+        }
+        return nil
+    }
+
+    static var warp: OpenWithApp? {
+        if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "dev.warp.Warp-Stable") {
+            return OpenWithApp(appURL: url)
+        }
+        let commonPaths = [
+            "/Applications/Warp.app",
+            NSHomeDirectory() + "/Applications/Warp.app",
+        ]
+        for path in commonPaths {
+            if FileManager.default.fileExists(atPath: path) {
+                return OpenWithApp(appURL: URL(fileURLWithPath: path))
+            }
+        }
+        return nil
+    }
+
+    static var ghostty: OpenWithApp? {
+        if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.mitchellh.ghostty") {
+            return OpenWithApp(appURL: url)
+        }
+        let commonPaths = [
+            "/Applications/Ghostty.app",
+            NSHomeDirectory() + "/Applications/Ghostty.app",
+        ]
+        for path in commonPaths {
+            if FileManager.default.fileExists(atPath: path) {
+                return OpenWithApp(appURL: URL(fileURLWithPath: path))
+            }
+        }
+        return nil
+    }
+
+    static var zed: OpenWithApp? {
+        if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "dev.zed.Zed") {
+            return OpenWithApp(appURL: url)
+        }
+        let commonPaths = [
+            "/Applications/Zed.app",
+            NSHomeDirectory() + "/Applications/Zed.app",
+        ]
+        for path in commonPaths {
+            if FileManager.default.fileExists(atPath: path) {
+                return OpenWithApp(appURL: URL(fileURLWithPath: path))
+            }
+        }
+        return nil
+    }
+
     static let terminal = OpenWithApp(bundleIdentifier: "com.apple.Terminal")
+
     static var defaultApps: [OpenWithApp] {
-        [
+        var candidates: [OpenWithApp?] = [
+            // 终端系列（原生终端保底）
+            iterm2,
+            warp,
+            ghostty,
             .terminal,
+            // 现代代码编辑器
+            cursor,
             vscode,
-        ].compactMap { $0 }
+            zed,
+        ]
+        var seen = Set<String>()
+        return candidates.compactMap { $0 }.filter { seen.insert($0.url.path).inserted }
     }
 }
 
@@ -185,18 +281,36 @@ struct RCAction: @MainActor RCBase {
     }
 
     var id: String
-
     var name: String
     var enabled = true
     var idx: Int
     var icon: String
+    var script: String?
+    var runInBackground: Bool = false
 
-    init(id: String, name: String, enabled: Bool = true, idx: Int, icon: String) {
+    init(
+        id: String = UUID().uuidString,
+        name: String,
+        enabled: Bool = true,
+        idx: Int,
+        icon: String,
+        script: String? = nil,
+        runInBackground: Bool = false
+    ) {
         self.id = id
         self.name = name
         self.enabled = enabled
         self.idx = idx
         self.icon = icon
+        self.script = script
+        self.runInBackground = runInBackground
+    }
+
+    var isCustomScript: Bool {
+        guard let script, !script.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return false
+        }
+        return true
     }
 }
 
@@ -204,12 +318,30 @@ struct RCAction: @MainActor RCBase {
 extension RCAction {
 
     static let copyPath = RCAction(id: "copy-path", name: "Copy Path", enabled: true, idx: 0, icon: "doc.on.doc")
-    static let deleteDirect = RCAction(id: "delete-direct", name: "Delete Direct", enabled: true, idx: 1, icon: "trash")
-    static let hideFileDir = RCAction(id: "hide", name: "Hide", enabled: false, idx: 2, icon: "eye.slash")
-    static let unhideFileDir = RCAction(id: "unhide", name: "Unhide", enabled: false, idx: 3, icon: "eye")
-    static let airdrop = RCAction(id: "airdrop", name: "AirDrop", enabled: false, idx: 4, icon: "paperplane")
+    static let copyName = RCAction(id: "copy-name", name: "Copy File Name", enabled: true, idx: 1, icon: "doc.text")
+    static let openTerminal = RCAction(id: "open-terminal", name: "Open in Terminal", enabled: true, idx: 2, icon: "terminal")
+    static let openEditor = RCAction(id: "open-editor", name: "Open in Code Editor", enabled: true, idx: 3, icon: "chevron.left.forwardslash.chevron.right")
+    static let createSymlink = RCAction(id: "create-symlink", name: "Create Symlink", enabled: true, idx: 4, icon: "link")
+    static let calcSha256 = RCAction(id: "calc-sha256", name: "Calculate SHA256", enabled: true, idx: 5, icon: "number")
+    static let calcMd5 = RCAction(id: "calc-md5", name: "Calculate MD5", enabled: false, idx: 6, icon: "number.circle")
+    static let deleteDirect = RCAction(id: "delete-direct", name: "Delete Direct", enabled: true, idx: 7, icon: "trash")
+    static let airdrop = RCAction(id: "airdrop", name: "AirDrop", enabled: true, idx: 8, icon: "paperplane")
+    static let hideFileDir = RCAction(id: "hide", name: "Hide", enabled: false, idx: 9, icon: "eye.slash")
+    static let unhideFileDir = RCAction(id: "unhide", name: "Unhide", enabled: false, idx: 10, icon: "eye")
 
-    static let all: [RCAction] = [.copyPath, .deleteDirect, .airdrop, .hideFileDir, .unhideFileDir]
+    static let all: [RCAction] = [
+        .copyPath,
+        .copyName,
+        .openTerminal,
+        .openEditor,
+        .createSymlink,
+        .calcSha256,
+        .calcMd5,
+        .deleteDirect,
+        .airdrop,
+        .hideFileDir,
+        .unhideFileDir
+    ]
 }
 
 // New File Type
@@ -246,7 +378,7 @@ extension NewFile {
     // 写回数据库的就是一排随机 id，和种子数据对不上，`displayName` 查译文也就没了依据。
     //
     // icon 字段为 SF Symbol 名称，作为 NSWorkspace 获取失败时的 fallback
-    static let json = NewFile(ext: ".json", name: "JSON", enabled: false, idx: 0, icon: "curlybraces", id: "json")
+    static let json = NewFile(ext: ".json", name: "JSON", enabled: true, idx: 0, icon: "curlybraces", id: "json")
     static let txt = NewFile(ext: ".txt", name: "TXT", idx: 1, icon: "doc.text", id: "txt")
     static let md = NewFile(ext: ".md", name: "Markdown", idx: 2, icon: "doc.richtext", id: "md")
     static let docx = NewFile(ext: ".docx", name: "DOCX", idx: 3, icon: "doc.richtext.fill", id: "docx")
@@ -356,6 +488,12 @@ extension RCAction {
     var displayName: String {
         switch id {
         case "copy-path": return AppLocalization.localized("Copy Path")
+        case "copy-name": return AppLocalization.localized("Copy File Name")
+        case "open-terminal": return AppLocalization.localized("Open in Terminal")
+        case "open-editor": return AppLocalization.localized("Open in Code Editor")
+        case "create-symlink": return AppLocalization.localized("Create Symlink")
+        case "calc-sha256": return AppLocalization.localized("Calculate SHA256")
+        case "calc-md5": return AppLocalization.localized("Calculate MD5")
         case "delete-direct": return AppLocalization.localized("Delete Direct")
         case "hide": return AppLocalization.localized("Hide")
         case "unhide": return AppLocalization.localized("Unhide")

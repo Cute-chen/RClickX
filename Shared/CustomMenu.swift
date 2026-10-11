@@ -1,8 +1,8 @@
 import AppKit
 
 /// Layout only: leaves reference existing configured items, never executable commands.
-struct MenuNode: Codable {
-    enum Kind: String, Codable { case item, submenu, separator }
+struct MenuNode: Codable, Equatable {
+    enum Kind: String, Codable, Equatable { case item, submenu, separator }
 
     var type: Kind
     var title: String?
@@ -61,7 +61,19 @@ struct MenuNode: Codable {
                 matches = config.apps.filter { id != nil ? $0.id == id : $0.appURL == appPath }.map(\.id)
             case .newFile:
                 guard appPath == nil else { throw CustomMenuError.invalid("new-file requires id or fileExtension") }
-                matches = config.newFiles.filter { id != nil ? $0.id == id : $0.ext == fileExtension }.map(\.id)
+                if let id {
+                    matches = config.newFiles.filter { $0.id == id }.map(\.id)
+                } else {
+                    let requestedExtension = fileExtension.map {
+                        $0.trimmingCharacters(in: CharacterSet(charactersIn: ". \t")).lowercased()
+                    }
+                    matches = config.newFiles.filter { file in
+                        let configuredExtension = file.ext
+                            .trimmingCharacters(in: CharacterSet(charactersIn: ". \t"))
+                            .lowercased()
+                        return configuredExtension == requestedExtension
+                    }.map(\.id)
+                }
             case .commonDir:
                 guard appPath == nil, fileExtension == nil else { throw CustomMenuError.invalid("common-dir requires id") }
                 matches = config.commonDirs.filter { $0.id == id }.map(\.id)

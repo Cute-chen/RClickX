@@ -84,10 +84,39 @@ final class MenuService {
         self.customMenuURL = customMenuURL
     }
 
-    /// The real location, in the shared App Group container.
+    /// Explicit override for isolated test runs.
+    nonisolated(unsafe) static var customMenuURLOverride: URL?
+
+    /// The real location in the shared App Group container, with fallback for unsigned dev / tests.
     static var defaultCustomMenuURL: URL? {
-        FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: Constants.suitName)?
-            .appendingPathComponent("custom_menu.json")
+        if let override = customMenuURLOverride {
+            return override
+        }
+        if let container = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: Constants.suitName) {
+            return container.appendingPathComponent("custom_menu.json")
+        }
+        // Fallback for unsigned dev / tests
+        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first?
+            .appendingPathComponent("RClickX", isDirectory: true)
+        if let appSupport {
+            try? FileManager.default.createDirectory(at: appSupport, withIntermediateDirectories: true)
+            return appSupport.appendingPathComponent("custom_menu.json")
+        }
+        return nil
+    }
+
+    /// The backup location of the custom menu layout before presets or resets were applied.
+    static var defaultCustomMenuBackupURL: URL? {
+        defaultCustomMenuURL?.deletingLastPathComponent().appendingPathComponent(customMenuBackupName)
+    }
+
+    /// Backs up the current live custom menu file if it exists.
+    static func backupCurrentCustomMenu() {
+        guard let url = defaultCustomMenuURL,
+              let backup = defaultCustomMenuBackupURL,
+              FileManager.default.fileExists(atPath: url.path) else { return }
+        try? FileManager.default.removeItem(at: backup)
+        try? FileManager.default.copyItem(at: url, to: backup)
     }
 
     /// Seed only once, using configured IDs so the example works on this installation.
@@ -126,11 +155,19 @@ final class MenuService {
     ///
     /// Status checks use this so that merely inspecting the custom menu cannot
     /// perturb the configuration that gets sent to the extension.
-    static func makePayload(from state: AppState, version: Int = 0) -> MenuConfigPayload {
-        let actionMenuItems = state.actions.filter(\.enabled).map { $0.toActionMenuItem() }
+    static func makePayload(
+        from state: AppState,
+        version: Int = 0,
+        includeDisabledItems: Bool = false
+    ) -> MenuConfigPayload {
+        let actionMenuItems = (includeDisabledItems ? state.actions : state.actions.filter(\.enabled))
+            .map { $0.toActionMenuItem() }
         let appMenuItems = state.apps.map { $0.toAppMenuItem() }
-        let newFileMenuItems = state.newFiles.filter(\.enabled).map { NewFileMenuItem(id: $0.id, name: $0.displayName, ext: $0.ext, icon: $0.icon) }
-        let commonDirMenuItems = state.showCommonDirs ? state.cdirs.map { CommonDirMenuItem(id: $0.id, name: $0.displayName, icon: $0.icon, url: $0.url.path) } : []
+        let newFileMenuItems = (includeDisabledItems ? state.newFiles : state.newFiles.filter(\.enabled))
+            .map { NewFileMenuItem(id: $0.id, name: $0.displayName, ext: $0.ext, icon: $0.icon) }
+        let commonDirMenuItems = (includeDisabledItems || state.showCommonDirs)
+            ? state.cdirs.map { CommonDirMenuItem(id: $0.id, name: $0.displayName, icon: $0.icon, url: $0.url.path) }
+            : []
 
         return MenuConfigPayload(
             version: version,

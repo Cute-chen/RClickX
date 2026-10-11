@@ -82,20 +82,57 @@ class SharedDataManager {
     /// 改成显式抛出后，调用方能把原因说清楚再退。
     static func bootstrap() throws {
         guard openedContainer == nil else { return }
-        openedContainer = try makeSharedModelContainer()
+        let container = try makeSharedModelContainer()
+        openedContainer = container
+
+        // 核心修复：在任何组件读取配置之前，同步完成种子数据初始化
+        let context = ModelContext(container)
+        initializeDefaultData(context: context)
     }
 
     /// 定位容器目录并打开 ModelContainer。不做任何 trap，失败一律抛给调用方。
     static func makeSharedModelContainer() throws -> ModelContainer {
-        // 获取 App Group 共享目录
-        guard let containerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupIdentifier) else {
-            throw SharedStoreError.appGroupUnavailable(identifier: appGroupIdentifier)
-        }
-        let storeURL = containerURL.appendingPathComponent("RClickDatabase.sqlite")
+        var storeURL: URL?
 
-        // 创建 ModelConfiguration 使用共享路径
+        // 1. 尝试获取并确保 App Group 共享目录真实存在且可写
+        if let containerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupIdentifier) {
+            var isDir: ObjCBool = false
+            let exists = FileManager.default.fileExists(atPath: containerURL.path, isDirectory: &isDir)
+
+            if exists && isDir.boolValue {
+                storeURL = containerURL.appendingPathComponent("RClickDatabase.sqlite")
+            } else {
+                do {
+                    try FileManager.default.createDirectory(at: containerURL, withIntermediateDirectories: true)
+                    storeURL = containerURL.appendingPathComponent("RClickDatabase.sqlite")
+                } catch {
+                    logger.warning("无法创建 App Group 共享目录（未签名或沙盒限制: \(error.localizedDescription)），将回退到本地 Application Support")
+                }
+            }
+        }
+
+        // 2. 如果处于测试环境，或者 App Group 目录不可用，回退到本地 Application Support
+        let finalStoreURL: URL
+        let isTesting = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+            || ProcessInfo.processInfo.environment["XCTestBundlePath"] != nil
+            || NSClassFromString("XCTestCase") != nil
+
+        if isTesting {
+            let tempDir = FileManager.default.temporaryDirectory
+            finalStoreURL = tempDir.appendingPathComponent("RClickTestDatabase.sqlite")
+        } else if let storeURL = storeURL {
+            finalStoreURL = storeURL
+        } else {
+            let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first ?? FileManager.default.temporaryDirectory
+            let fallbackDir = appSupport.appendingPathComponent("RClick", isDirectory: true)
+            try? FileManager.default.createDirectory(at: fallbackDir, withIntermediateDirectories: true)
+            finalStoreURL = fallbackDir.appendingPathComponent("RClickDatabase.sqlite")
+            logger.info("App Group 不可用，使用本地 Application Support 回退路径: \(finalStoreURL.path)")
+        }
+
+        // 创建 ModelConfiguration
         let configuration = ModelConfiguration(
-            url: storeURL,
+            url: finalStoreURL,
             allowsSave: true,
             cloudKitDatabase: .none
         )
@@ -112,16 +149,39 @@ class SharedDataManager {
                 configurations: configuration
             )
         } catch {
-            logger.error("打开共享 ModelContainer 失败: \(error)")
-            throw SharedStoreError.storeUnreadable(url: storeURL, underlying: error)
+            logger.warning("打开指定数据库失败 (\(error))，正在尝试回退到本地 Application Support 数据库...")
+
+            let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first ?? FileManager.default.temporaryDirectory
+            let fallbackDir = appSupport.appendingPathComponent("RClick", isDirectory: true)
+            try? FileManager.default.createDirectory(at: fallbackDir, withIntermediateDirectories: true)
+            let fallbackURL = fallbackDir.appendingPathComponent("RClickLocal.sqlite")
+
+            if finalStoreURL != fallbackURL {
+                let fallbackConfig = ModelConfiguration(url: fallbackURL, allowsSave: true, cloudKitDatabase: .none)
+                if let fallbackContainer = try? ModelContainer(
+                    for: AppEntity.self,
+                         ActionEntity.self,
+                         NewFileTypeEntity.self,
+                         CommonDirEntity.self,
+                         BookmarkEntity.self,
+                         DataVersion.self,
+                    configurations: fallbackConfig
+                ) {
+                    logger.info("已成功回退并打开本地 Application Support 数据库: \(fallbackURL.path)")
+                    return fallbackContainer
+                }
+            }
+
+            logger.error("打开 ModelContainer 彻底失败: \(error)")
+            throw SharedStoreError.storeUnreadable(url: finalStoreURL, underlying: error)
         }
     }
 
-    /// 初始化默认数据
-    static func initializeDefaultData(context: ModelContext) async {
+    /// 初始化默认数据（同步执行，防止启动时序竞态）
+    static func initializeDefaultData(context: ModelContext) {
         // 检查是否已有数据
         let actionDescriptor = FetchDescriptor<ActionEntity>()
-        let actionCount = try? context.fetchCount(actionDescriptor)
+        let actionCount = (try? context.fetchCount(actionDescriptor)) ?? 0
 
         if actionCount == 0 {
             // 插入默认动作

@@ -54,9 +54,20 @@ final class ConfigService {
                 name: entity.name,
                 enabled: entity.isEnabled,
                 idx: entity.sortOrder,
-                icon: entity.icon
+                icon: entity.icon,
+                script: entity.script,
+                runInBackground: entity.runInBackground
             )
         } ?? []
+        if data.actions.isEmpty {
+            data.actions = RCAction.all
+        } else {
+            for defaultAction in RCAction.all {
+                if !data.actions.contains(where: { $0.id == defaultAction.id }) {
+                    data.actions.append(defaultAction)
+                }
+            }
+        }
 
         // NewFiles
         let newFileDescriptor = FetchDescriptor<NewFileTypeEntity>(sortBy: [SortDescriptor(\.sortOrder)])

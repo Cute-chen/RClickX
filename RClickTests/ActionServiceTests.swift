@@ -7,6 +7,7 @@
 //
 
 import Foundation
+import AppKit
 import SwiftData
 import Testing
 @testable import RClick
@@ -33,9 +34,11 @@ final class ActionServiceTests {
         var cdirs: [CommonDir] = []
         var showCommonDirs = false
 
-        func getAppItem(rid: String) -> OpenWithApp? { nil }
-        func getActionItem(rid: String) -> RCAction? { nil }
-        func getFileType(rid: String) -> NewFile? { nil }
+        func getAppItem(rid: String) -> OpenWithApp? { apps.first(where: { $0.id == rid }) }
+        func getActionItem(rid: String) -> RCAction? {
+            actions.first(where: { $0.id == rid }) ?? RCAction.all.first(where: { $0.id == rid })
+        }
+        func getFileType(rid: String) -> NewFile? { newFiles.first(where: { $0.id == rid }) }
     }
 
     @Test func deleteIsSkippedWhenAuthorizationIsCancelled() async throws {
@@ -112,6 +115,123 @@ final class ActionServiceTests {
             #expect(loaded.openApp == file.openApp)
             try service.save(AppConfigData(newFiles: [loaded]))
         }
+    }
+
+    @Test func copyPathAndCopyNameWriteToPasteboard() {
+        let permission = MockPermission()
+        let service = ActionService(state: MockState(), permission: permission)
+
+        service.copyPath(["/Users/tester/Documents/file.txt"])
+        #expect(NSPasteboard.general.string(forType: .string) == "/Users/tester/Documents/file.txt")
+
+        service.copyName(["/Users/tester/Documents/file.txt", "/Users/tester/Downloads/archive.zip"])
+        #expect(NSPasteboard.general.string(forType: .string) == "file.txt\narchive.zip")
+    }
+
+    @Test func createSymlinkCreatesValidLink() async throws {
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("rclick-symlink-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+
+        let sourceFile = dir.appendingPathComponent("source.txt")
+        try Data("source content".utf8).write(to: sourceFile)
+
+        let permission = MockPermission()
+        permission.hasAccessResult = true
+        let service = ActionService(state: MockState(), permission: permission)
+
+        await service.createSymlink([sourceFile.path])
+
+        let contents = try FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil)
+        let symlink = try #require(contents.first(where: { $0.lastPathComponent != "source.txt" }))
+        let dest = try FileManager.default.destinationOfSymbolicLink(atPath: symlink.path)
+        #expect(dest == sourceFile.path)
+    }
+
+    @Test func calculateHashComputesSha256AndMd5() async throws {
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("rclick-hash-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+
+        let file = dir.appendingPathComponent("sample.txt")
+        try Data("hello".utf8).write(to: file)
+
+        let permission = MockPermission()
+        permission.hasAccessResult = true
+        let service = ActionService(state: MockState(), permission: permission)
+
+        await service.calculateHash([file.path], algorithm: .sha256)
+        #expect(NSPasteboard.general.string(forType: .string) == "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824")
+
+        await service.calculateHash([file.path], algorithm: .md5)
+        #expect(NSPasteboard.general.string(forType: .string) == "5d41402abc4b2a76b9719d911017c592")
+    }
+
+    @Test func actionHandlerDispatchesNewActions() async {
+        let permission = MockPermission()
+        let state = MockState()
+        let service = ActionService(state: state, permission: permission)
+
+        await service.actionHandler(rid: "copy-name", target: ["/Users/tester/Documents/readme.md"], trigger: "ctx-items")
+        #expect(NSPasteboard.general.string(forType: .string) == "readme.md")
+    }
+
+    @Test func customScriptExecutesWithVariablesAndWritesToClipboard() async throws {
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("rclick-script-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+
+        let testFile = dir.appendingPathComponent("testdoc.txt")
+        try Data("test content".utf8).write(to: testFile)
+
+        let customAction = RCAction(
+            id: "custom-echo",
+            name: "Echo Test",
+            enabled: true,
+            idx: 99,
+            icon: "terminal",
+            script: "echo Result: $NAME in $DIR",
+            runInBackground: true
+        )
+
+        let state = MockState()
+        state.actions = [customAction]
+        let service = ActionService(state: state, permission: MockPermission())
+
+        await service.actionHandler(rid: customAction.id, target: [testFile.path], trigger: "ctx-items")
+
+        let clipboardContent = NSPasteboard.general.string(forType: .string) ?? ""
+        #expect(clipboardContent.contains("Result: testdoc.txt in \(dir.path)"))
+    }
+
+    @Test func customActionEntityPersistsScriptFields() throws {
+        let container = try ModelContainer(
+            for: ActionEntity.self,
+            configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+        )
+        let context = container.mainContext
+
+        let action = RCAction(
+            id: "custom-script-id",
+            name: "Test Script",
+            enabled: true,
+            idx: 0,
+            icon: "terminal",
+            script: "echo $PATH",
+            runInBackground: true
+        )
+
+        context.insert(ActionEntity(from: action))
+        try context.save()
+
+        let fetched = try context.fetch(FetchDescriptor<ActionEntity>())
+        let saved = try #require(fetched.first)
+        #expect(saved.id == "custom-script-id")
+        #expect(saved.script == "echo $PATH")
+        #expect(saved.runInBackground == true)
     }
 
 }

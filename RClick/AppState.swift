@@ -80,9 +80,9 @@ class AppState: ObservableObject, ActionStateProviding {
         // Before anything reads the switches above.
         Self.migrateLayoutToggles(from: .standard, to: .group)
         self.inExt = inExt
+        // 核心修复：同步加载配置数据，确保实例创建完成后内存中已有可用菜单
+        refresh()
         Task { @MainActor in
-            logger.debug("start load")
-            refresh()
             bookmarkManager.restoreBookmarks(context: configService.modelContext)
         }
     }
@@ -165,6 +165,25 @@ class AppState: ObservableObject, ActionStateProviding {
         persist()
     }
 
+    @MainActor func addAction(_ action: RCAction) {
+        var newAction = action
+        newAction.idx = actions.count
+        actions.append(newAction)
+        persist()
+    }
+
+    @MainActor func updateAction(_ action: RCAction) {
+        if let idx = actions.firstIndex(where: { $0.id == action.id }) {
+            actions[idx] = action
+            persist()
+        }
+    }
+
+    @MainActor func deleteAction(id: String) {
+        actions.removeAll(where: { $0.id == id })
+        persist()
+    }
+
     @MainActor func resetActionItems() {
         actions = RCAction.all
         persist()
@@ -176,7 +195,12 @@ class AppState: ObservableObject, ActionStateProviding {
     }
 
     @MainActor func refresh() {
-        let data = configService.load()
+        var data = configService.load()
+        if data.actions.isEmpty && data.newFiles.isEmpty && data.apps.isEmpty {
+            logger.info("检测到配置为空，正在自动灌入默认初始数据...")
+            SharedDataManager.initializeDefaultData(context: configService.modelContext)
+            data = configService.load()
+        }
         apps = data.apps
         actions = data.actions
         newFiles = data.newFiles
