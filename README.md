@@ -87,14 +87,6 @@ RClickX 的核心界面：编排应用、动作、文件模板与常用目录，
 
 </details>
 
-> 🎞️ **动图位置**：将 Finder 操作演示保存为 `img/demo.gif`，然后取消下方 HTML 注释即可。
->
-> ```html
-> <p align="center">
->   <img src="./img/demo.gif" alt="RClickX Finder 操作演示" width="860">
-> </p>
-> ```
-
 ## ✨ 功能
 
 - **开箱即用**：首次启动引导启用 Finder 扩展，并预先授权常用工作目录。

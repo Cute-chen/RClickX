@@ -87,14 +87,6 @@ The core RClickX workspace: arrange apps, actions, file templates, and favorite 
 
 </details>
 
-> 🎞️ **GIF slot**: save the Finder workflow demo as `img/demo.gif`, then uncomment the HTML block below.
->
-> ```html
-> <p align="center">
->   <img src="./img/demo.gif" alt="RClickX Finder workflow demo" width="860">
-> </p>
-> ```
-
 ## ✨ Features
 
 - **Ready to use**: the first-launch flow guides you through enabling the Finder extension and authorizing commonly used folders.
