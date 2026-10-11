@@ -106,8 +106,27 @@ struct EditFileTypeSheetView: View {
                             }
                         }
                     }
+                    .onDrop(of: [.fileURL], isTargeted: nil) { providers in
+                        guard let provider = providers.first else { return false }
+                        _ = provider.loadObject(ofClass: URL.self) { url, _ in
+                            guard let url = url else { return }
+                            Task { @MainActor in
+                                self.template = url
+                                if self.name.isEmpty {
+                                    self.name = url.deletingPathExtension().lastPathComponent
+                                }
+                                if self.ext.isEmpty {
+                                    self.ext = url.pathExtension
+                                }
+                            }
+                        }
+                        return true
+                    }
                 } header: {
                     Text(appLocalized: "Template")
+                } footer: {
+                    Text(appLocalized: "Tip: Drag and drop a file here to use it as a template")
+                        .foregroundColor(.secondary)
                 }
 
                 Section {

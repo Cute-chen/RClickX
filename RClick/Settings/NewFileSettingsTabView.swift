@@ -108,6 +108,25 @@ struct NewFileSettingsTabView: View {
                     }
                 }
                 .frame(minHeight: 180)
+                .onDrop(of: [.fileURL], isTargeted: nil) { providers in
+                    guard let provider = providers.first else { return false }
+                    _ = provider.loadObject(ofClass: URL.self) { url, _ in
+                        guard let url = url else { return }
+                        Task { @MainActor in
+                            var newFile = NewFile(
+                                ext: url.pathExtension,
+                                name: url.deletingPathExtension().lastPathComponent,
+                                idx: appState.newFiles.count
+                            )
+                            newFile.template = url
+                            self.editingFile = newFile
+                        }
+                    }
+                    return true
+                }
+            } footer: {
+                Text(appLocalized: "Tip: Drag and drop any template file here to add it")
+                    .foregroundColor(.secondary)
             }
         }
         .formStyle(.grouped)
