@@ -11,7 +11,6 @@ import SwiftUI
 struct MenuDesignerTabView: View {
     @EnvironmentObject var appState: AppState
     @ObservedObject var viewModel: MenuDesignerViewModel
-    @State private var showResetConfirmation = false
     @State private var showPresetSheet = false
 
     init(viewModel: MenuDesignerViewModel = MenuDesignerViewModel()) {
@@ -98,17 +97,6 @@ struct MenuDesignerTabView: View {
         .sheet(isPresented: $viewModel.showRawJsonSheet) {
             RawJsonSheetView(viewModel: viewModel)
         }
-        .alert(
-            Text(appLocalized: "Restore Default Menu?"),
-            isPresented: $showResetConfirmation
-        ) {
-            Button(AppLocalization.localized("Restore"), role: .destructive) {
-                viewModel.restoreDefaultLayout(using: appState)
-            }
-            Button(AppLocalization.localized("Cancel"), role: .cancel) {}
-        } message: {
-            Text(appLocalized: "This resets the context menu to the default structure. Your custom ordering and submenus will be removed.")
-        }
     }
 
     // MARK: - Toolbar Header
@@ -176,16 +164,6 @@ struct MenuDesignerTabView: View {
             .controlSize(.small)
             .help(AppLocalization.localized("View Generated JSON"))
 
-            // Reset to defaults
-            Button {
-                showResetConfirmation = true
-            } label: {
-                Image(systemName: "arrow.counterclockwise")
-            }
-            .buttonStyle(.bordered)
-            .controlSize(.small)
-            .help(AppLocalization.localized("Restore Default Layout"))
-
             // Save & Apply button
             Button {
                 viewModel.saveAndApply(using: appState)
@@ -214,13 +192,9 @@ struct MenuDesignerTabView: View {
                         .foregroundStyle(.secondary)
                     Text(appLocalized: "No menu items yet")
                         .font(.headline)
-                    Text(appLocalized: "Add items from the toolbar or restore defaults to get started.")
+                    Text(appLocalized: "Add items from the toolbar to get started.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                    Button(AppLocalization.localized("Restore Default Layout")) {
-                        viewModel.restoreDefaultLayout(using: appState)
-                    }
-                    .buttonStyle(.bordered)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .padding()
