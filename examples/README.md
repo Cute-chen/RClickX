@@ -1,4 +1,4 @@
-# 自定义 Finder 菜单
+# RClickX 自定义 Finder 菜单
 
 `custom_menu.json` 是菜单根节点数组；顺序就是显示顺序。示例将 VS Code、Warp 平铺，次要动作放在“更多”，TXT / Markdown 放在第三级“新建文件”。
 
@@ -30,14 +30,14 @@
 
 以下是手动安装仓库示例的方法：
 
-1. 先在 RClick 设置中添加 VS Code、Warp，启用 Copy Path、TXT 和 Markdown。应用路径要与配置完全一致；不存在、禁用或有歧义的引用会导致整份配置回退，控制台会记录原因。
+1. 先在 RClickX 设置中添加 VS Code、Warp，启用 Copy Path、TXT 和 Markdown。应用路径要与配置完全一致；不存在、禁用或有歧义的引用会导致整份配置回退，控制台会记录原因。
 2. 将本目录的 `custom_menu.json` 复制到 App Group 根目录：
 
    ```sh
-   cp examples/custom_menu.json "$HOME/Library/Group Containers/group.cn.wflixu.RClick/custom_menu.json"
+   cp examples/custom_menu.json "$HOME/Library/Group Containers/group.com.cutechen.rclickx/custom_menu.json"
    ```
 
-   目录应由正常签名并运行过的 RClick 创建。实际读取使用 `FileManager.containerURL(forSecurityApplicationGroupIdentifier:)`；若改变 App Group 标识，使用对应容器。
+   目录应由正常签名并运行过的 RClickX 创建。实际读取使用 `FileManager.containerURL(forSecurityApplicationGroupIdentifier:)`；若改变 App Group 标识，使用对应容器。
 3. 回到 **设置 → 通用 → 自定义菜单** 点「应用配置」。菜单只在点它之后才改变；只把文件放进去不会生效。
 4. 删除或移走该文件即恢复原来的分类顺序与折叠设置——删除是例外，它不等待应用，下一次心跳就会回到默认布局（设置里的「恢复默认…」按钮做的也是这件事，还会留一份备份）。JSON 错误、结构错误、无法读取或引用不唯一则**不会**改变菜单：点「应用配置」时弹提示说明原因，当前菜单保持原样；`[]` 是有意显示空菜单。
 

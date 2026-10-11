@@ -1,153 +1,199 @@
+<p align="center">
+  <a href="https://github.com/Cute-chen/RClickX/releases">
+    <img src="./RClick/Assets.xcassets/AppIcon.appiconset/AppIcon@1x.png" alt="RClickX logo" width="128">
+  </a>
+</p>
 
-[![](./RClick/Assets.xcassets/AppIcon.appiconset/AppIcon@1x.png)](https://github.com/wflixu/RClick/releases)
+<h1 align="center">RClickX</h1>
 
-# RClick
+<p align="center">面向 macOS Finder 的右键菜单增强工具</p>
 
-[![Swift 6.2](https://img.shields.io/badge/Swift-6.2-ED523F.svg?style=flat)](https://swift.org/)
-[![SwiftUI](https://img.shields.io/badge/SwiftUI-✓-orange)](https://developer.apple.com/xcode/swiftui/)
-[![macOS 15.6+](https://img.shields.io/badge/macOS_15.6+-Compatible-green)](https://www.apple.com/macos/macos-sequoia/)
-[![Xcode 16.4+](https://img.shields.io/badge/Xcode-16.4+-blue)](https://developer.apple.com/xcode/)
-[![License](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
-[![GitHub release](https://img.shields.io/github/v/release/wflixu/RClick)](https://github.com/wflixu/RClick/releases)
-[![GitHub downloads](https://img.shields.io/github/downloads/wflixu/RClick/total)](https://github.com/wflixu/RClick/releases)
+<p align="center">
+  <a href="README.md">简体中文</a> · <a href="README.en.md">English</a>
+</p>
 
-Enhance your macOS Finder context menu with custom actions. Built with Swift 6.2 and SwiftUI for macOS 15.6+. Full dark mode support with adaptive icons.
+<p align="center">
+  <a href="https://swift.org/"><img src="https://img.shields.io/badge/Swift-6.x-ED523F.svg?style=flat" alt="Swift"></a>
+  <a href="https://developer.apple.com/xcode/swiftui/"><img src="https://img.shields.io/badge/SwiftUI-✓-orange" alt="SwiftUI"></a>
+  <a href="https://www.apple.com/macos/"><img src="https://img.shields.io/badge/macOS-14.0%2B-green" alt="macOS 14.0+"></a>
+  <a href="https://developer.apple.com/xcode/"><img src="https://img.shields.io/badge/Xcode-16.4%2B-blue" alt="Xcode 16.4+"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-GPLv3-blue.svg" alt="GPLv3 license"></a>
+</p>
 
-## 🚀 Features
+RClickX 把常用的文件操作、应用启动器、新建文件模板和常用目录集中到 Finder 上下文菜单中，并提供可视化菜单编排和权限管理界面。
 
-- [x] **Open with External App** — Open files or directories with any installed application, with support for custom arguments and environment variables.
-- [x] **Copy Path** — Copy the full path of selected files or folders to clipboard.
-- [x] **Delete Directly** — Delete files or folders directly, bypassing Trash.
-- [x] **Hide / Unhide** — Toggle file visibility in Finder.
-- [x] **AirDrop** — Share files instantly via AirDrop.
-- [x] **Create New Files** — Generate new files from templates directly in Finder. Supports `.txt`, `.json`, `.md`, `.docx`, `.pptx`, `.xlsx`, as well as Apple iWork formats: `.pages`, `.key`, `.numbers`.
-- [x] **Quick Access Folders** — Pin frequently used directories to the right-click menu.
-- [x] **Dark Mode** — Full light/dark appearance support with adaptive icons and SF Symbols.
+> **二次开发声明**<br>
+> 本项目基于李旭（[@wflixu](https://github.com/wflixu)）的 [RClick](https://github.com/wflixu/RClick) 二次开发，保留原项目的开源说明与致谢，并根据 GPLv3 要求发布修改后的代码。RClickX 与原项目是两个独立项目。
 
-## 🏗 Architecture
+## 📸 产品预览
 
-RClick uses a dual-process architecture:
+### 可视化菜单设计器
 
-| Component | Description |
-|-----------|-------------|
-| **Main App** (`RClick/`) | SwiftUI menu bar app — manages settings, state, and file operations |
-| **FinderSync Extension** (`FinderSyncExt/`) | Injected into Finder — renders custom context menu items |
+RClickX 的核心界面：编排应用、动作、文件模板与常用目录，右侧实时预览 Finder 菜单，完成后点击「应用到访达」。
 
-Communication between the two processes uses `DistributedNotificationCenter`. Settings are persisted via SwiftData with a shared App Group container.
+<p align="center">
+  <a href="./img/设计页.png">
+    <img src="./img/设计页.png" alt="RClickX 可视化菜单设计器与菜单预览" width="860">
+  </a>
+</p>
 
-## 📸 Screenshots
+<p align="center"><sub>点击图片查看原图</sub></p>
 
+<details>
+<summary>查看三种工作流预设</summary>
 
-![](./images/rclick-v2.0.1-screenshot.png)
+<table>
+  <tr>
+    <td width="50%" align="center">
+      <a href="./img/通用预设.png"><img src="./img/通用预设.png" alt="RClickX 通用预设" width="430"></a><br>
+      <sub><b>通用预设</b> · 适合日常文件操作</sub>
+    </td>
+    <td width="50%" align="center">
+      <a href="./img/开发者预设.png"><img src="./img/开发者预设.png" alt="RClickX 开发者预设" width="430"></a><br>
+      <sub><b>开发者预设</b> · 终端、代码模板与开发工具</sub>
+    </td>
+  </tr>
+  <tr>
+    <td colspan="2" align="center">
+      <a href="./img/办公预设.png"><img src="./img/办公预设.png" alt="RClickX 办公预设" width="430"></a><br>
+      <sub><b>办公预设</b> · Office 文档与文件分享</sub>
+    </td>
+  </tr>
+</table>
 
+</details>
 
+<details>
+<summary>查看新手引导、通用设置与关于页</summary>
 
-## 📦 Installation
+<table>
+  <tr>
+    <td width="50%" align="center">
+      <a href="./img/新手引导页.png"><img src="./img/新手引导页.png" alt="RClickX 新手引导" width="360"></a><br>
+      <sub><b>新手引导</b> · 启用扩展、授权目录、选择预设和语言</sub>
+    </td>
+    <td width="50%" align="center">
+      <a href="./img/通用设置页.png"><img src="./img/通用设置页.png" alt="RClickX 通用设置" width="430"></a><br>
+      <sub><b>通用设置</b> · 启动项、图标、语言和权限</sub>
+    </td>
+  </tr>
+  <tr>
+    <td colspan="2" align="center">
+      <a href="./img/关于页.png"><img src="./img/关于页.png" alt="RClickX 关于页" width="430"></a><br>
+      <sub><b>关于页</b> · 版本、更新检查和社区入口</sub>
+    </td>
+  </tr>
+</table>
 
-### Download
+</details>
 
-Get the latest release from the [Releases page](https://github.com/wflixu/RClick/releases).
+> 🎞️ **动图位置**：将 Finder 操作演示保存为 `img/demo.gif`，然后取消下方 HTML 注释即可。
+>
+> ```html
+> <p align="center">
+>   <img src="./img/demo.gif" alt="RClickX Finder 操作演示" width="860">
+> </p>
+> ```
 
-Download the `.dmg`, open it, and drag **RClick** to your Applications folder.
+## ✨ 功能
 
-> **Note:** On first launch, you may need to enable the Finder extension in **System Settings → Privacy & Security → Extensions → Added Extensions**.
+- **开箱即用**：首次启动引导启用 Finder 扩展，并预先授权常用工作目录。
+- **三种工作流预设**：提供通用、开发者和办公布局，可在新手引导或设计页中选择后继续自定义。
+- **可视化菜单设计器**：拖拽调整顺序，创建多级子菜单和分隔线，自定义标题与 SF Symbols 图标，并实时预览菜单结构。
+- **应用启动器**：自动识别已安装的 Ghostty、Warp、iTerm2、Terminal、Cursor、VS Code、Zed 和 Sublime Text。
+- **文件操作**：复制文件名、复制完整路径、创建符号链接、计算 SHA-256；MD5 可作为独立动作启用。
+- **新建文件**：从模板创建 `.txt`、`.json`、`.md`、`.docx`、`.pptx`、`.xlsx`、`.pages`、`.key` 和 `.numbers` 文件，也可以拖入现有文件创建模板。
+- **系统辅助**：直接删除（绕过废纸篓）、AirDrop、隐藏/显示文件，以及快速访问常用目录。
+- **按文件夹授权**：文件操作使用 macOS security-scoped bookmarks 保存授权，不依赖 Full Disk Access。
+- **自动更新**：关于页面可以检查 GitHub Releases，并在有新版本时提示更新。
+- **深色模式**：界面和 Finder 菜单图标适配 macOS 外观。
 
-### Build from Source
+## 🏗 架构
+
+| 组件 | 目录 | 职责 |
+| --- | --- | --- |
+| 主程序 | `RClick/` | SwiftUI 设置界面、状态管理、权限、配置持久化和文件操作 |
+| Finder 扩展 | `FinderSyncExt/` | 在 Finder 中读取当前目标并渲染右键菜单 |
+| 共享代码 | `Shared/` | 菜单模型、动作定义、本地化和进程间消息模型 |
+
+两个进程通过 `DistributedNotificationCenter` 通信，配置和 SwiftData 数据通过 App Group 共享。扩展未运行或主程序未启动时，Finder 菜单会显示相应状态提示。
+
+## 📦 安装
+
+1. 从 [Releases](https://github.com/Cute-chen/RClickX/releases) 下载最新的 `RClickX-vX.Y.Z.dmg`。
+2. 打开 DMG，将 **RClickX.app** 拖入 `Applications`。
+3. 启动 RClickX，按新手向导启用 Finder 扩展。
+4. 在设置中添加需要执行文件操作的文件夹。
+
+macOS 的系统设置名称可能随版本变化。macOS 26/27 通常位于 **系统设置 → 通用 → 登录项与扩展 → 扩展 → Finder**；较早版本位于 **隐私与安全性 → 扩展 → Finder 扩展**。首次授权后，RClickX 会保存文件夹书签，后续操作无需重复选择同一目录。
+
+### Homebrew Cask
+
+仓库包含 Cask 配方 `Casks/rclickx.rb`。将它发布到自己的 tap 后，可以按 tap 名称安装；配方尚未发布到 tap 前，建议使用 GitHub Release DMG。
+
+## 🔧 从源码构建
+
+### 环境要求
+
+- macOS 14.0 或更高版本
+- Xcode 16.4 或更高版本
+- Apple Silicon 构建脚本默认使用 `arm64`
+- Finder 扩展正常运行需要有效的开发者签名；未签名构建适合编译和单元测试验证
 
 ```bash
-git clone https://github.com/wflixu/RClick.git
-cd RClick
+git clone https://github.com/Cute-chen/RClickX.git
+cd RClickX
 open RClick.xcodeproj
 ```
 
-- Requires **Xcode 16.4+** and **macOS 15.6+**
-- Select the **RClick** scheme, then **Product → Build** (⌘B)
-- The FinderSync extension will be automatically registered
-
-### Requirements
-
-| Requirement | Details |
-|-------------|---------|
-| **Folder Access** | Per-folder authorization for file operations (prompted automatically) |
-| **Accessibility** | Required for certain automation features |
-| **Finder Extension** | Must be enabled in System Settings |
-
-## 🔧 Development
+无签名环境下验证编译和测试：
 
 ```bash
-# Build
-xcodebuild -project RClick.xcodeproj -scheme RClick -destination 'platform=macOS'
+xcodebuild build \
+  -project RClick.xcodeproj \
+  -scheme RClick \
+  -destination 'platform=macOS' \
+  CODE_SIGN_IDENTITY='' \
+  CODE_SIGNING_REQUIRED=NO \
+  CODE_SIGNING_ALLOWED=NO
 
-# Build for Release
-xcodebuild -project RClick.xcodeproj -scheme RClick -configuration Release
+xcodebuild test \
+  -project RClick.xcodeproj \
+  -scheme RClick \
+  -destination 'platform=macOS' \
+  CODE_SIGN_IDENTITY='' \
+  CODE_SIGNING_REQUIRED=NO \
+  CODE_SIGNING_ALLOWED=NO
 ```
 
-### Key Technologies
-- **Swift 6.2** with full concurrency checking
-- **SwiftUI** for all UI components
-- **AppKit** for system integration only (NSWorkspace, NSPasteboard)
-- **SwiftData** for persistence with shared container
-- **FinderSync** framework for Finder extension
-- **DistributedNotificationCenter** for IPC
+本地生成 DMG、ZIP 和 SHA-256 校验文件：
 
-### 🌐 Localization
+```bash
+./scripts/build-dmg.sh --config Release
+```
 
-RClick supports five languages with the following priority:
+产物默认写入 `dist/`。未提供签名身份时使用 ad-hoc 签名，不能替代 Developer ID 签名和公证。
 
-| Language | Code | Notes |
-|----------|------|-------|
-| **English** | `en` | Default/base language |
-| **Simplified Chinese** | `zh-Hans` | Primary localization target |
-| **Japanese** | `ja` | Activated when system language is Japanese |
-| **Spanish** | `es` | Activated when system language is Spanish |
-| **French** | `fr` | Activated when system language is French |
+## 🧩 自定义菜单
 
-**Principles:**
-- Default language is English (also the fallback for unsupported system languages)
-- All string keys are in English in the code, localized via `Localizable.xcstrings`
-- System language is auto-detected — no manual language picker in the app
-- To add a new language, add an entry to `Localizable.xcstrings` and register it in the Xcode project
+在 **设置 → 设计** 中添加、排序或分组菜单项，完成后点击 **应用到访达**。设计页还可以查看生成的 `custom_menu.json`；该文件用于存储顶层项目、嵌套子菜单、分隔线和自定义标题。完整字段和示例见 [examples/README.md](examples/README.md)。
 
-## 👥 Contributors
+## 🌐 语言
 
-Thanks to all the people who have contributed to RClick!
+README 与应用界面支持简体中文和英文。在新手引导或 **设置 → 通用 → 界面语言** 中选择 **跟随系统、简体中文或 English**。跟随系统时，中文系统使用简体中文，其他系统语言使用英文。
 
-<a href="https://github.com/wflixu/RClick/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=wflixu/RClick" />
-</a>
+## 👥 致谢
 
-Recent contributions:
+- 原项目作者：李旭（[@wflixu](https://github.com/wflixu)）— [RClick](https://github.com/wflixu/RClick)
+- 菜单树与外置卷监听：[@Juns-g](https://github.com/Juns-g)
+- 法语、西班牙语与字符串目录贡献：[@Dam0rt](https://github.com/Dam0rt)、[@EliasMatDev](https://github.com/EliasMatDev)、[@P013onEr](https://github.com/P013onEr)
+- Finder 监听稳定性修复：[@shoal-rat](https://github.com/shoal-rat)
+- 其他代码与构建改进：[@chunyang-wen](https://github.com/chunyang-wen)、[@stors789](https://github.com/stors789)
 
-- **[@Juns-g](https://github.com/Juns-g)** — declarative hierarchical tree menus ([#151](https://github.com/wflixu/RClick/pull/151)), and watching mounted volumes so external and network drives show the menu ([#152](https://github.com/wflixu/RClick/pull/152))
-- **[@Dam0rt](https://github.com/Dam0rt)** — French localization ([#149](https://github.com/wflixu/RClick/pull/149))
-- **[@stors789](https://github.com/stors789)** — App Groups provisioning in the release pipeline ([#141](https://github.com/wflixu/RClick/pull/141))
-- **[@EliasMatDev](https://github.com/EliasMatDev)** — Latin American Spanish localization ([#138](https://github.com/wflixu/RClick/pull/138))
-- **[@shoal-rat](https://github.com/shoal-rat)** — Finder observation fix, so the menu appears in every folder ([#126](https://github.com/wflixu/RClick/pull/126))
-- **[@P013onEr](https://github.com/P013onEr)** — string catalogs and trilingual localization ([#120](https://github.com/wflixu/RClick/pull/120)), draggable menu ordering ([#121](https://github.com/wflixu/RClick/pull/121))
-- **[@chunyang-wen](https://github.com/chunyang-wen)** — removed a needless `await` ([#21](https://github.com/wflixu/RClick/pull/21))
+## 🤝 参与贡献
 
-## Similar Projects
+欢迎提交 Issue 和 Pull Request。提交前请阅读 [贡献指南](CONTRIBUTING.md)、[安全策略](SECURITY.md)、[行为准则](CODE_OF_CONDUCT.md) 和 [更新记录](CHANGELOG.md)。
 
-- [SzContext](https://github.com/RoadToDream/SzContext)
-- [MenuHelper](https://github.com/Kyle-Ye/MenuHelper)
-- [SwiftyMenu](https://github.com/lexrus/SwiftyMenu)
-- [OpenInTerminal](https://github.com/Ji4n1ng/OpenInTerminal)
+## 📜 开源协议
 
-## 🤝 Contributing
-
-We welcome contributions! Here's how you can help:
-
-- **[Report a Bug](https://github.com/wflixu/RClick/issues/new?template=bug_report.md)** — Found something broken? Let us know.
-- **[Request a Feature](https://github.com/wflixu/RClick/issues/new?template=feature_request.md)** — Have an idea? We'd love to hear it.
-- **[Submit a PR](CONTRIBUTING.md)** — Read our contribution guide to get started.
-- **[Security Policy](SECURITY.md)** — How to responsibly report vulnerabilities.
-
-Please read our [Code of Conduct](CODE_OF_CONDUCT.md) before participating.
-
-## Hierarchical Custom Menus
-
-Top-level items can be mixed with arbitrarily nested submenus, separators, and custom titles and icons.
-
-Drop a declarative `custom_menu.json` into the App Group container, then go to **Settings → General → Custom Menu** and press "Apply" for it to take effect. Editing the file on its own changes nothing, so an edit that is still half-written cannot break your menu. With no file present the default layout is used; with an invalid one the menu stays exactly as it was and Settings shows which element failed to parse.
-
-See [configuration examples and usage](examples/README.md).
+RClickX 按 [GNU General Public License v3.0](LICENSE) 发布。分发修改后的版本时，请保留 GPLv3 文本、原项目版权与致谢信息，并清楚标注修改内容。

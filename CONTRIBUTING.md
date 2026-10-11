@@ -32,7 +32,7 @@ This project follows the [Contributor Covenant Code of Conduct](CODE_OF_CONDUCT.
 
 | Tool | Version |
 |------|---------|
-| **macOS** | 15.6 (Sequoia) or later |
+| **macOS** | 14.0 (Sonoma) or later |
 | **Xcode** | 16.4 or later |
 | **Swift** | 6.2 or later |
 
