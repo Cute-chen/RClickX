@@ -177,6 +177,7 @@ struct SettingsView: View {
                 }
                 .help(isSidebarVisible ? AppLocalization.localized("Hide Sidebar") : AppLocalization.localized("Show Sidebar"))
                 .keyboardShortcut("s", modifiers: [.command, .control])
+                .focusEffectDisabled()
             }
         }
         .background(Color(NSColor.windowBackgroundColor))

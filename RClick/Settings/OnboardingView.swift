@@ -65,6 +65,9 @@ struct OnboardingView: View {
         }
         .id(languageManager.refreshID)
         .frame(width: 680, height: 640)
+        // The onboarding window should not draw macOS's default blue focus ring
+        // around its controls when it becomes key.
+        .focusEffectDisabled()
         .onAppear {
             checkStatus()
         }
@@ -110,6 +113,7 @@ struct OnboardingView: View {
             .labelsHidden()
             .pickerStyle(.menu)
             .frame(width: 120)
+            .focusEffectDisabled()
         }
     }
 
@@ -164,6 +168,7 @@ struct OnboardingView: View {
             }
             .buttonStyle(.borderedProminent)
             .controlSize(.small)
+            .focusEffectDisabled()
         }
         .padding(14)
         .background(Color(NSColor.controlBackgroundColor))
@@ -232,6 +237,7 @@ struct OnboardingView: View {
                     }
                     .buttonStyle(.borderedProminent)
                     .controlSize(.small)
+                    .focusEffectDisabled()
 
                     Menu {
                         Button {
@@ -252,6 +258,7 @@ struct OnboardingView: View {
                     }
                     .menuStyle(.borderlessButton)
                     .help(AppLocalization.localized("More Authorization Options"))
+                    .focusEffectDisabled()
                 }
             }
 
@@ -260,6 +267,7 @@ struct OnboardingView: View {
             }
             .buttonStyle(.bordered)
             .controlSize(.small)
+            .focusEffectDisabled()
         }
         .padding(14)
         .background(Color(NSColor.controlBackgroundColor))
@@ -308,6 +316,7 @@ struct OnboardingView: View {
             }
             .buttonStyle(.bordered)
             .controlSize(.small)
+            .focusEffectDisabled()
         }
         .padding(14)
         .background(Color(NSColor.controlBackgroundColor))
@@ -383,6 +392,7 @@ struct OnboardingView: View {
             }
             .buttonStyle(.borderedProminent)
             .controlSize(.regular)
+            .focusEffectDisabled()
         }
     }
 
@@ -427,5 +437,6 @@ struct OnboardingView: View {
         hasCompletedOnboarding = true
         dismiss()
         WindowManager.shared.closeOnboarding()
+        WindowManager.shared.showSettings(appState: appState)
     }
 }

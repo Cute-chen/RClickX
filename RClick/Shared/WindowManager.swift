@@ -22,6 +22,7 @@ final class WindowManager {
         if let window = onboardingWindow {
             window.makeKeyAndOrderFront(nil)
             NSApplication.shared.activate(ignoringOtherApps: true)
+            window.makeFirstResponder(nil)
             return
         }
 
@@ -31,6 +32,7 @@ final class WindowManager {
             .environment(\.locale, LanguageManager.shared.locale)
 
         let hostingController = NSHostingController(rootView: view)
+        hostingController.view.focusRingType = .none
         let window = NSWindow(contentViewController: hostingController)
         window.identifier = NSUserInterfaceItemIdentifier(Constants.onboardingWindowID)
         window.title = AppLocalization.localized("Getting Started")
@@ -42,6 +44,7 @@ final class WindowManager {
 
         window.makeKeyAndOrderFront(nil)
         NSApplication.shared.activate(ignoringOtherApps: true)
+        window.makeFirstResponder(nil)
     }
 
     func closeOnboarding() {
@@ -53,6 +56,7 @@ final class WindowManager {
         if let window = settingsWindow {
             window.makeKeyAndOrderFront(nil)
             NSApplication.shared.activate(ignoringOtherApps: true)
+            window.makeFirstResponder(nil)
             return
         }
 
@@ -77,6 +81,7 @@ final class WindowManager {
 
         let container = SettingsContainer(appState: appState, updateManager: updateManager)
         let hostingController = NSHostingController(rootView: container)
+        hostingController.view.focusRingType = .none
         let window = NSWindow(contentViewController: hostingController)
         window.identifier = NSUserInterfaceItemIdentifier(Constants.settingsWindowID)
         window.title = AppLocalization.localized("Settings")
@@ -88,6 +93,7 @@ final class WindowManager {
 
         window.makeKeyAndOrderFront(nil)
         NSApplication.shared.activate(ignoringOtherApps: true)
+        window.makeFirstResponder(nil)
     }
 
     func closeSettings() {
