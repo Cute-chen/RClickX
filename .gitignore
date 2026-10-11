@@ -57,4 +57,12 @@ playground.xcworkspace
 
 output/*
 Build/
+build/
+dist/
+.dmg-staging/
+signing/
 DerivedData/
+# Local and generated workspace artifacts
+.DS_Store
+.derived-data-log-*
+.claude/
