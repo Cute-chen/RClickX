@@ -127,10 +127,6 @@ When you first download and open the app from GitHub, macOS may show **“Cannot
 
 The exact System Settings labels vary by macOS release. On macOS 26/27, the extension is usually under **System Settings → General → Login Items & Extensions → Extensions → Finder**; older releases use **Privacy & Security → Extensions → Finder Extensions**. After a folder is authorized once, RClickX stores a security-scoped bookmark for later operations.
 
-### Homebrew Cask
-
-The repository includes a Cask definition at `Casks/rclickx.rb`. Publish it to your own tap before installing it through Homebrew; until then, the GitHub Release DMG is the recommended installation path.
-
 ## 🔧 Build from source
 
 ### Requirements

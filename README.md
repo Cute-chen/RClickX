@@ -127,10 +127,6 @@ RClickX 的核心界面：编排应用、动作、文件模板与常用目录，
 
 macOS 的系统设置名称可能随版本变化。macOS 26/27 通常位于 **系统设置 → 通用 → 登录项与扩展 → 扩展 → Finder**；较早版本位于 **隐私与安全性 → 扩展 → Finder 扩展**。首次授权后，RClickX 会保存文件夹书签，后续操作无需重复选择同一目录。
 
-### Homebrew Cask
-
-仓库包含 Cask 配方 `Casks/rclickx.rb`。将它发布到自己的 tap 后，可以按 tap 名称安装；配方尚未发布到 tap 前，建议使用 GitHub Release DMG。
-
 ## 🔧 从源码构建
 
 ### 环境要求
