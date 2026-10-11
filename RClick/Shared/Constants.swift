@@ -12,6 +12,8 @@ public enum Constants {
     static let HomedirPath = Utils.getRealHomeDir()
     /// The identifier for the settings window.
     static let settingsWindowID = "rclick-settings"
+    /// The identifier for the onboarding window.
+    static let onboardingWindowID = "rclick-onboarding"
     static let protectedDirs = [
         HomedirPath + "/Desktop/",
         HomedirPath + "/Desktop/danger/",
@@ -25,6 +27,9 @@ public enum Constants {
         "/sbin/",
         "/var/"
     ]
-    static let suitName = "group.cn.wflixu.RClick"
+    static let appName = "RClickX"
+    static let suitName = "group.com.cutechen.rclickx"
+    static let mainAppBundleID = "com.cutechen.rclickx"
+    static let extensionBundleID = "com.cutechen.rclickx.FinderSyncExt"
 
 }
