@@ -29,7 +29,7 @@ If applicable, add screenshots to help explain the problem.
 | Detail | Value |
 |--------|-------|
 | **RClick Version** | [e.g. 2.0.4] |
-| **macOS Version** | [e.g. 15.6] |
+| **macOS Version** | [e.g. 14.5 / 15.2] |
 | **Mac Model** | [e.g. MacBook Pro M3] |
 | **Installation Method** | [DMG / Built from Source] |
 

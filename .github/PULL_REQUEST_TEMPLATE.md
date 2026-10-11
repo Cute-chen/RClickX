@@ -47,7 +47,7 @@ xcodebuild -project RClick.xcodeproj -scheme RClick -destination 'platform=macOS
 
 - [ ] My code follows the project's Swift 6.2 conventions (see [CONTRIBUTING.md](../CONTRIBUTING.md))
 - [ ] All UI is SwiftUI (no AppKit UI components)
-- [ ] I have tested on macOS 15.6+
+- [ ] I have tested on macOS 14.0+
 - [ ] I have tested with both light and dark mode
 - [ ] I have updated documentation if needed
 - [ ] My branch is up-to-date with `dev`

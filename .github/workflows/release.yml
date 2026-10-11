@@ -18,10 +18,10 @@ jobs:
     runs-on: macos-latest
     env:
       APP_NAME: RClick
-      APP_BUNDLE_ID: cn.wflixu.RClick
+      APP_BUNDLE_ID: com.cutechen.rclickx
       EXTENSION_NAME: FinderSyncExt
-      EXTENSION_BUNDLE_ID: cn.wflixu.RClick.FinderSyncExt
-      APP_GROUP_ID: group.cn.wflixu.RClick
+      EXTENSION_BUNDLE_ID: com.cutechen.rclickx.FinderSyncExt
+      APP_GROUP_ID: group.com.cutechen.rclickx
       SCHEME: RClick
       PROJECT: RClick.xcodeproj
     steps:
@@ -42,8 +42,21 @@ jobs:
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Will release version: $VERSION"
 
+      # --- 0b. 检查是否有开发者签名密钥 ---
+      - name: Check Code Signing Secrets
+        id: check_signing
+        run: |
+          if [ -n "${{ secrets.MACOS_CERT_P12 }}" ] && [ -n "${{ secrets.APPLE_TEAM_ID }}" ]; then
+            echo "has_signing=true" >> "$GITHUB_OUTPUT"
+            echo "Developer ID signing secrets configured."
+          else
+            echo "has_signing=false" >> "$GITHUB_OUTPUT"
+            echo "Developer ID signing secrets not configured; will build ad-hoc release package."
+          fi
+
       # --- 1. 导入签名证书 ---
       - name: Import Developer ID Certificate
+        if: steps.check_signing.outputs.has_signing == 'true'
         env:
           CERTIFICATE_P12: ${{ secrets.MACOS_CERT_P12 }}
           CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
@@ -82,6 +95,7 @@ jobs:
           echo "Using certificate: $CERT_NAME ($CERT_IDENTITY)"
 
       - name: Prepare App Group Provisioning Profiles
+        if: steps.check_signing.outputs.has_signing == 'true'
         env:
           APP_PROFILE_BASE64: ${{ secrets.MACOS_APP_PROVISIONING_PROFILE }}
           EXTENSION_PROFILE_BASE64: ${{ secrets.MACOS_EXTENSION_PROVISIONING_PROFILE }}
@@ -167,6 +181,7 @@ jobs:
 
       # --- 2. 构建 Release App ---
       - name: Build Release
+        if: steps.check_signing.outputs.has_signing == 'true'
         env:
           VERSION: ${{ steps.version.outputs.version }}
         run: |
@@ -180,7 +195,7 @@ jobs:
             -derivedDataPath build \
             -destination "generic/platform=macOS" \
             ARCHS=arm64 \
-            MACOSX_DEPLOYMENT_TARGET=15.6 \
+            MACOSX_DEPLOYMENT_TARGET=14.0 \
             CODE_SIGNING_ALLOWED=NO \
             SWIFT_ACTIVE_COMPILATION_CONDITIONS="" \
             CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
@@ -200,6 +215,7 @@ jobs:
 
       # --- 3. 分层代码签名 ---
       - name: Code Sign
+        if: steps.check_signing.outputs.has_signing == 'true'
         env:
           TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
@@ -272,6 +288,7 @@ jobs:
 
       # --- 4. 打包为 ZIP 用于公证 ---
       - name: Zip for Notarization
+        if: steps.check_signing.outputs.has_signing == 'true'
         run: |
           VERSION=${{ steps.version.outputs.version }}
           ZIP_NAME="${APP_NAME}-v${VERSION}.notarize.zip"
@@ -280,6 +297,7 @@ jobs:
 
       # --- 5. 公证 ---
       - name: Notarize
+        if: steps.check_signing.outputs.has_signing == 'true'
         env:
           TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           KEY_ID: ${{ secrets.NOTARY_KEY_ID }}
@@ -318,43 +336,47 @@ jobs:
 
       # --- 6. 绑定公证票据 ---
       - name: Staple
+        if: steps.check_signing.outputs.has_signing == 'true'
         run: |
           xcrun stapler staple "$APP_PATH"
           spctl --assess --type execute --verbose=4 "$APP_PATH"
 
       # --- 7. 创建 DMG ---
       - name: Install create-dmg
+        if: steps.check_signing.outputs.has_signing == 'true'
         run: brew install create-dmg
 
       - name: Create DMG
+        if: steps.check_signing.outputs.has_signing == 'true'
         run: |
           VERSION=${{ steps.version.outputs.version }}
-          DMG_NAME="${APP_NAME}-v${VERSION}.dmg"
+          DMG_NAME="RClickX-v${VERSION}.dmg"
 
           DMG_STAGING="dmg-staging"
           rm -rf "$DMG_STAGING"
           mkdir -p "$DMG_STAGING"
-          ditto "$APP_PATH" "$DMG_STAGING/${APP_NAME}.app"
+          ditto "$APP_PATH" "$DMG_STAGING/RClickX.app"
 
           create-dmg \
-            --volname "${APP_NAME}" \
+            --volname "RClickX" \
             --window-pos 200 120 \
             --window-size 600 400 \
             --icon-size 100 \
-            --icon "${APP_NAME}.app" 150 200 \
-            --hide-extension "${APP_NAME}.app" \
+            --icon "RClickX.app" 150 200 \
+            --hide-extension "RClickX.app" \
             --app-drop-link 450 200 \
             "$DMG_NAME" \
-            "$DMG_STAGING/${APP_NAME}.app"
+            "$DMG_STAGING/RClickX.app"
 
           codesign --force --sign "$CERT_IDENTITY" "$DMG_NAME"
+          shasum -a 256 "$DMG_NAME" | awk '{print $1}' > "${DMG_NAME}.sha256"
 
           rm -rf "$DMG_STAGING"
-
           echo "DMG_NAME=$DMG_NAME" >> $GITHUB_ENV
 
       # --- 7b. DMG 公证 ---
       - name: Notarize DMG
+        if: steps.check_signing.outputs.has_signing == 'true'
         env:
           TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           KEY_ID: ${{ secrets.NOTARY_KEY_ID }}
@@ -386,23 +408,35 @@ jobs:
 
       # --- 8. 创建 .app.zip（给自动更新器用）---
       - name: Create App ZIP
+        if: steps.check_signing.outputs.has_signing == 'true'
         run: |
           VERSION=${{ steps.version.outputs.version }}
-          ZIP_NAME="${APP_NAME}-v${VERSION}.app.zip"
+          ZIP_NAME="RClickX-v${VERSION}.app.zip"
 
           ZIP_STAGING="zip-staging"
           rm -rf "$ZIP_STAGING"
           mkdir -p "$ZIP_STAGING"
-          ditto "$APP_PATH" "$ZIP_STAGING/${APP_NAME}.app"
-          ditto -c -k --sequesterRsrc --keepParent "$ZIP_STAGING/${APP_NAME}.app" "$ZIP_NAME"
+          ditto "$APP_PATH" "$ZIP_STAGING/RClickX.app"
+          ditto -c -k --sequesterRsrc --keepParent "$ZIP_STAGING/RClickX.app" "$ZIP_NAME"
           rm -rf "$ZIP_STAGING"
 
           SHA256=$(shasum -a 256 "$ZIP_NAME" | awk '{print $1}')
           printf '%s  %s\n' "$SHA256" "$ZIP_NAME" > "${ZIP_NAME}.sha256"
 
           echo "ZIP_NAME=$ZIP_NAME" >> $GITHUB_ENV
+          ls -lh "$ZIP_NAME" "${ZIP_NAME}.sha256" "$DMG_NAME" "${DMG_NAME}.sha256"
 
-          ls -lh "$ZIP_NAME" "${ZIP_NAME}.sha256" "$DMG_NAME"
+      # --- 8b. 无签名密钥时的兜底打包（用于社区/分支发布）---
+      - name: Build & Package (Ad-hoc Community Release)
+        if: steps.check_signing.outputs.has_signing != 'true'
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          ./scripts/build-dmg.sh --version "$VERSION" --config Release
+          DMG_FILE=$(find dist -name "*.dmg" | head -n 1)
+          ZIP_FILE=$(find dist -name "*.zip" | head -n 1)
+          echo "DMG_NAME=$DMG_FILE" >> $GITHUB_ENV
+          echo "ZIP_NAME=$ZIP_FILE" >> $GITHUB_ENV
 
       # --- 9. 创建 GitHub Release ---
       - name: Create Release
@@ -412,8 +446,9 @@ jobs:
             ${{ env.ZIP_NAME }}
             ${{ env.ZIP_NAME }}.sha256
             ${{ env.DMG_NAME }}
+            ${{ env.DMG_NAME }}.sha256
           generate_release_notes: true
-          prerelease: true
+          prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

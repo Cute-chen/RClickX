@@ -31,7 +31,7 @@ RClick 决定放弃 App Store 发布，转为纯开源项目。需要两个关�
 
 **平台约束（PR 和 Release 一致）**：
 - `ARCHS=arm64` — 仅支持 Apple Silicon，**不支持 x86_64**
-- `MACOSX_DEPLOYMENT_TARGET=15.6` — 最低系统要求 macOS 15.6
+- `MACOSX_DEPLOYMENT_TARGET=14.0` — 最低系统要求 macOS 14.0 (Sonoma)
 
 ### 1.2 Tag 触发自动发布工作流
 
@@ -39,7 +39,7 @@ RClick 决定放弃 App Store 发布，转为纯开源项目。需要两个关�
 
 - **触发**: 推送 `v*` tag（如 `v2.0.2`）
 - **权限**: `contents: write`
-- **平台约束**: `ARCHS=arm64`，`MACOSX_DEPLOYMENT_TARGET=15.6`（与 PR 工作流一致）
+- **平台约束**: `ARCHS=arm64`，`MACOSX_DEPLOYMENT_TARGET=14.0`（与 PR 工作流一致）
 
 **产出两个包**（版本号从 tag 提取，如推送 `v2.0.2` 则版本为 `2.0.2`）：
 
@@ -112,7 +112,7 @@ RClick 决定放弃 App Store 发布，转为纯开源项目。需要两个关�
 | 参数 | 值 | 说明 |
 |------|-----|------|
 | `ARCHS` | `arm64` | 仅 Apple Silicon，**不包含 x86_64** |
-| `MACOSX_DEPLOYMENT_TARGET` | `15.6` | 最低 macOS 15.6 |
+| `MACOSX_DEPLOYMENT_TARGET` | `14.0` | 最低 macOS 14.0 (Sonoma) |
 | `-destination` | `generic/platform=macOS` | 通用 macOS 目标 |
 | `-scheme` | `RClick` | 主 scheme（自动包含 FinderSyncExt） |
 
