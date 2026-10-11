@@ -90,6 +90,7 @@ extension LaunchAtLogin {
     public struct Toggle<Label: View>: View {
         @ObservedObject private var launchAtLogin = LaunchAtLogin.observable
         private let label: Label
+        private let compact: Bool
 
         /**
         Creates a toggle that displays a custom label.
@@ -97,29 +98,35 @@ extension LaunchAtLogin {
         - Parameters:
             - label: A view that describes the purpose of the toggle.
         */
-        public init(@ViewBuilder label: () -> Label) {
+        public init(compact: Bool = false, @ViewBuilder label: () -> Label) {
             self.label = label()
+            self.compact = compact
         }
 
         public var body: some View {
-            VStack(alignment: .leading, spacing: 4) {
-                SwiftUI.Toggle(isOn: $launchAtLogin.isEnabled) { label }
-                if let warningKey = warningMessageKey {
-                    SwiftUI.Label {
-                        Text(AppLocalization.localized(warningKey))
-                    } icon: {
-                        Image(systemName: "exclamationmark.triangle.fill")
+            if compact {
+                SwiftUI.Toggle("", isOn: $launchAtLogin.isEnabled)
+                    .labelsHidden()
+            } else {
+                VStack(alignment: .leading, spacing: 4) {
+                    SwiftUI.Toggle(isOn: $launchAtLogin.isEnabled) { label }
+                    if let warningKey = warningMessageKey {
+                        SwiftUI.Label {
+                            Text(AppLocalization.localized(warningKey))
+                        } icon: {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                        }
+                        .font(.footnote)
+                        .foregroundColor(.yellow)
+                        .fixedSize(horizontal: false, vertical: true)
                     }
-                    .font(.footnote)
-                    .foregroundColor(.yellow)
-                    .fixedSize(horizontal: false, vertical: true)
                 }
             }
         }
 
         /// 当登录项实际未生效时给出提示：
         /// - .requiresApproval：macOS 13+ 首次启用需用户在系统设置批准
-        /// - 其他非 enabled：多半是 app 不在 /Applications（Debug 从 Xcode 跑就是这种）
+        /// - 其他状态：交给系统设置处理，不在这里显示额外提示
         private var warningMessageKey: String? {
             switch SMAppService.mainApp.status {
             case .enabled:
@@ -127,7 +134,7 @@ extension LaunchAtLogin {
             case .requiresApproval:
                 return "Launch at login is pending approval in System Settings"
             case .notRegistered, .notFound:
-                return "Launch at login requires RClick to be installed in /Applications"
+                return nil
             @unknown default:
                 return nil
             }
@@ -146,6 +153,7 @@ extension LaunchAtLogin.Toggle<Text> {
     */
     public init(_ titleKey: LocalizedStringKey) {
         label = Text(titleKey)
+        compact = false
     }
 
     /**
@@ -158,6 +166,7 @@ extension LaunchAtLogin.Toggle<Text> {
     */
     public init(_ title: some StringProtocol) {
         label = Text(title)
+        compact = false
     }
 
     /**

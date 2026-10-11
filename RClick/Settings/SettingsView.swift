@@ -9,22 +9,16 @@ import AppKit
 import SwiftUI
 
 enum Tabs: String, CaseIterable, Identifiable {
+    case menuDesigner = "Designer"
     case general = "General"
-    case apps = "Apps"
-    case actions = "Actions"
-    case newFile = "New File"
-    case cdirs = "Common Dir"
     case about = "About"
 
     var id: String { self.rawValue }
 
     var icon: String {
         switch self {
+        case .menuDesigner: "rectangle.3.group"
         case .general: "gearshape"
-        case .apps: "app.badge"
-        case .actions: "bolt.square"
-        case .newFile: "doc.badge.plus"
-        case .cdirs: "folder.badge.gearshape"
         case .about: "info.circle"
         }
     }
@@ -32,19 +26,19 @@ enum Tabs: String, CaseIterable, Identifiable {
     /// 每个 tab 图标对应的圆角色块颜色
     var iconColor: Color {
         switch self {
+        case .menuDesigner: .purple
         case .general: .blue
-        case .apps: .indigo
-        case .actions: .orange
-        case .newFile: .green
-        case .cdirs: .teal
-        case .about: .purple
+        case .about: .gray
         }
     }
 }
 
 struct SettingsView: View {
-    @State private var selectedTab: Tabs = .general
+    @StateObject private var menuDesignerViewModel = MenuDesignerViewModel()
+    @State private var selectedTab: Tabs = .menuDesigner
+    @State private var isSidebarVisible: Bool = true
     @EnvironmentObject var appState: AppState
+    @ObservedObject private var languageManager = LanguageManager.shared
     @State var showSelectApp = false
 
     @ViewBuilder
@@ -57,7 +51,7 @@ struct SettingsView: View {
                     .aspectRatio(contentMode: .fit)
                     .frame(width: 48, height: 48)
 
-                Text("RClick")
+                Text("RClickX")
                     .font(.title3)
                     .fontWeight(.semibold)
 
@@ -69,7 +63,7 @@ struct SettingsView: View {
             .padding(.top, 20)
             .padding(.bottom, 16)
 
-            // 六个 tab 垂直排列，间距完全由代码控制（无原生 List 隐藏 inset）
+            // tab 垂直排列，间距完全由代码控制（无原生 List 隐藏 inset）
             VStack(spacing: 4) {
                 ForEach(Tabs.allCases, id: \.self) { tab in
                     sidebarButton(tab)
@@ -79,73 +73,116 @@ struct SettingsView: View {
 
             Spacer()
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .navigationSplitViewColumnWidth(200)
+        .frame(width: 180)
+        .background(Color(NSColor.windowBackgroundColor))
     }
 
-    /// 侧边栏单个 tab：选中时行背景为图标色的半透明色（如绿色图标 → 半透明绿）
+    @State private var hoveredTab: Tabs? = nil
+
+    /// 侧边栏单个 tab：直接调用 macOS 原生系统级材质（.regularMaterial / .ultraThinMaterial，底层为 NSVisualEffectView）
     private func sidebarButton(_ tab: Tabs) -> some View {
         let isSelected = selectedTab == tab
+        let isHovered = hoveredTab == tab
         return Button {
-            selectedTab = tab
+            guard selectedTab != tab else { return }
+            withAnimation(.easeInOut(duration: 0.15)) {
+                selectedTab = tab
+            }
         } label: {
-            HStack(spacing: 6) {
+            HStack(spacing: 8) {
+                // 原生图标底色
                 Image(systemName: tab.icon)
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(.white)
                     .frame(width: 28, height: 28)
-                    .background(
-                        RoundedRectangle(cornerRadius: 6)
-                            .fill(tab.iconColor)
-                    )
+                    .background(tab.iconColor, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
 
                 Text(appLocalized: tab.rawValue)
-                    .font(.system(size: 14, weight: isSelected ? .semibold : .medium))
-                    .foregroundStyle(isSelected ? .primary : .secondary)
+                    .font(.system(size: 13.5, weight: isSelected ? .semibold : .medium))
+                    .foregroundStyle(isSelected ? Color.primary : (isHovered ? Color.primary : Color.secondary))
 
                 Spacer()
             }
-            .padding(.horizontal, 12)
+            .padding(.horizontal, 10)
             .padding(.vertical, 6)
-            .background(
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(isSelected ? tab.iconColor.opacity(0.15) : .clear)
-            )
+            .background {
+                if isSelected {
+                    // macOS 原生磨砂玻璃材质（直接调用系统 NSVisualEffectView 引擎）
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(.regularMaterial)
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                .fill(tab.iconColor.opacity(0.18))
+                        }
+                } else if isHovered {
+                    // macOS 原生超轻薄磨砂玻璃材质悬停反馈
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(.ultraThinMaterial)
+                }
+            }
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .focusEffectDisabled()
+        .onHover { hovering in
+            withAnimation(.easeInOut(duration: 0.12)) {
+                hoveredTab = hovering ? tab : nil
+            }
+        }
     }
 
     @ViewBuilder var detailView: some View {
-        // 右侧内容
+        // 右侧内容：按需挂载当前选中的 Tab 视图，彻底消除侧边栏折叠/展开多 Tab 并发布局计算带来的卡顿掉帧
         Group {
-            switch self.selectedTab {
+            switch selectedTab {
+            case .menuDesigner:
+                MenuDesignerTabView(viewModel: menuDesignerViewModel)
             case .general:
                 GeneralSettingsTabView()
-            case .apps:
-                AppsSettingsTabView()
-            case .actions:
-                ActionSettingsTabView()
-            case .newFile:
-                NewFileSettingsTabView()
-            case .cdirs:
-                CommonDirsSettingTabView()
             case .about:
                 AboutSettingsTabView()
             }
         }
+        .id(languageManager.refreshID)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .frame(minWidth: 450)
     }
 
     var body: some View {
-        NavigationSplitView {
-            self.sidebar
-        } detail: {
+        HStack(spacing: 0) {
+            if isSidebarVisible {
+                self.sidebar
+                    .transition(.asymmetric(
+                        insertion: .move(edge: .leading).combined(with: .opacity),
+                        removal: .move(edge: .leading).combined(with: .opacity)
+                    ))
+
+                Divider()
+                    .transition(.opacity)
+            }
+
             self.detailView
         }
+        .clipped()
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .focusEffectDisabled()
         .navigationTitle(AppLocalization.localized(selectedTab.rawValue))
+        .toolbar {
+            ToolbarItem(placement: .navigation) {
+                Button {
+                    withAnimation(.spring(response: 0.32, dampingFraction: 0.88)) {
+                        isSidebarVisible.toggle()
+                    }
+                } label: {
+                    Image(systemName: "sidebar.leading")
+                }
+                .help(isSidebarVisible ? AppLocalization.localized("Hide Sidebar") : AppLocalization.localized("Show Sidebar"))
+                .keyboardShortcut("s", modifiers: [.command, .control])
+            }
+        }
         .background(Color(NSColor.windowBackgroundColor))
+        .onAppear {
+            menuDesignerViewModel.loadIfNeeded(using: appState)
+        }
         // A failed write used to be invisible: the change stayed on screen but was
         // never stored, so the only way to notice was losing it on the next launch.
         .alert(

@@ -33,23 +33,17 @@ struct RClickApp: App {
 
     @StateObject var appState = AppState.shared
 
-    @StateObject private var updateManager = UpdateManager(
-        owner: "wflixu",
-        repo: "RClick",
-        currentVersion: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0.0"
-    )
+    @ObservedObject private var updateManager = UpdateManager.shared
+    @ObservedObject private var languageManager = LanguageManager.shared
 
     var body: some Scene {
-        SettingsWindow(appState: appState, onAppear: {})
-            .defaultAppStorage(.group)
-            .environmentObject(updateManager)
-            .modelContainer(SharedDataManager.sharedModelContainer)
-
-        // showMenuBarExtra 为 true 时显示菜单条
+        // MenuBarExtra 独立驻留状态栏，不定义默认 Window 场景，彻底消除冷启动窗口闪烁
         MenuBarExtra(
-            "RClick", image: "MenuBar", isInserted: $showMenuBarExtra
+            "RClickX", image: "MenuBar", isInserted: $showMenuBarExtra
         ) {
             MenuBarView()
+                .environment(\.locale, languageManager.locale)
+                .environmentObject(updateManager)
         }
         .defaultAppStorage(.group)
     }
@@ -109,16 +103,29 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             NSApp.setActivationPolicy(.accessory)
         }
 
-        // 迁移旧的"开机登录"设置（修复前该开关只写入 UserDefaults，未真正注册登录项）
-        migrateLegacyLaunchAtLoginSetting()
+        // 显式设置应用 Dock 图标，防止 macOS LaunchServices 缓存导致 Dock 图标未刷新
+        if let appIcon = NSImage(named: "AppIcon") ?? NSImage(named: "Logo") {
+            NSApplication.shared.applicationIconImage = appIcon
+        }
 
-        // 执行数据迁移
+        // 首次启动默认注册登录项，同时保留之后用户手动关闭的选择。
+        configureLaunchAtLoginDefault()
+
+        // 执行数据准备与通信就绪
         Task { @MainActor [weak self] in
             guard let self = self else { return }
 
-            // 初始化默认数据
-            let context = ModelContext(SharedDataManager.sharedModelContainer)
-            await SharedDataManager.initializeDefaultData(context: context)
+            // 确保 AppState 数据最新并立即广播至访达扩展
+            appState.refresh()
+            sendMenuConfigurationUpdate()
+            messager.sendRunningNotification()
+
+            // 只在首次启动完成前自动弹出新手引导。访达扩展是否开启由引导页展示，
+            // 不应在用户完成引导后影响后续启动，否则每次启动都会重复打开窗口。
+            let hasCompletedOnboarding = UserDefaults.group.bool(forKey: "hasCompletedOnboarding")
+            if !hasCompletedOnboarding {
+                WindowManager.shared.showOnboarding(appState: self.appState)
+            }
 
             // Preload icons for all apps to improve performance
             Task { @MainActor in
@@ -172,19 +179,29 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         logger.info("applicationWillTerminate")
     }
 
-    /// 迁移旧的"开机登录"设置。
-    /// 修复前该开关仅写入 UserDefaults("launchAtLogin")，并未真正调用 SMAppService 注册登录项。
-    /// 若检测到旧值为开启，则补齐注册，并清除旧标记避免重复迁移。
-    private func migrateLegacyLaunchAtLoginSetting() {
+    /// 迁移旧的"开机登录"设置，并为新安装启用默认值。
+    /// 用户在设置页关闭后，配置标记会阻止后续启动再次覆盖这个选择。
+    private func configureLaunchAtLoginDefault() {
         let legacyKey = "launchAtLogin"
-        let defaults = UserDefaults.standard
-        guard defaults.bool(forKey: legacyKey) else { return }
+        let legacyDefaults = UserDefaults.standard
+        let defaults = UserDefaults.group
 
-        defaults.removeObject(forKey: legacyKey)
+        if legacyDefaults.object(forKey: legacyKey) != nil {
+            if legacyDefaults.bool(forKey: legacyKey), !LaunchAtLogin.isEnabled {
+                LaunchAtLogin.isEnabled = true
+            }
+            legacyDefaults.removeObject(forKey: legacyKey)
+            defaults.set(true, forKey: Key.launchAtLoginConfigured)
+            return
+        }
+
+        guard defaults.object(forKey: Key.launchAtLoginConfigured) == nil else { return }
 
         if !LaunchAtLogin.isEnabled {
             LaunchAtLogin.isEnabled = true
         }
+
+        defaults.set(true, forKey: Key.launchAtLoginConfigured)
     }
 
     // MARK: - Message Handlers

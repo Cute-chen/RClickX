@@ -9,12 +9,17 @@ import AppKit
 import SwiftUI
 
 struct MenuBarView: View {
-    @Environment(\.openWindow) var openWindow: OpenWindowAction
+    @ObservedObject private var languageManager = LanguageManager.shared
 
     let messager = Messager.shared
 
     var body: some View {
         VStack {
+            Button(action: actionOnboarding) {
+                Image(systemName: "sparkles")
+                Text(appLocalized: "Getting Started")
+            }
+
             Button(action: actionSettings) {
                 Image(systemName: "gearshape")
                 Text(appLocalized: "Settings")
@@ -27,19 +32,17 @@ struct MenuBarView: View {
             }
             .keyboardShortcut("q", modifiers: [.command])
         }
+        .id(languageManager.refreshID)
+    }
+
+    @MainActor
+    private func actionOnboarding() {
+        WindowManager.shared.showOnboarding(appState: AppState.shared)
     }
 
     @MainActor
     private func actionSettings() {
-        openWindow(id: Constants.settingsWindowID)
-
-        let windows = NSApplication.shared.windows
-
-        // 查找已存在的目标窗口
-        if let existingWindow = windows.first(where: { $0.identifier?.rawValue == Constants.settingsWindowID }) {
-            existingWindow.makeKeyAndOrderFront(nil) // 将窗口置于最前
-            NSApplication.shared.activate(ignoringOtherApps: true) // 激活应用
-        }
+        WindowManager.shared.showSettings(appState: AppState.shared)
     }
 
     @MainActor

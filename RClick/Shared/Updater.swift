@@ -21,25 +21,25 @@ struct GitHubRelease: Codable, Identifiable {
     let publishedAt: Date
     let assets: [Asset]
     let htmlUrl: String
-    
+
     var version: String {
         tagName.replacingOccurrences(of: "v", with: "")
     }
-    
+
     struct Asset: Codable {
         let id: Int
         let name: String
         let browserDownloadUrl: String
         let size: Int
         let contentType: String?
-        
+
         enum CodingKeys: String, CodingKey {
             case id, name, size
             case browserDownloadUrl = "browser_download_url"
             case contentType = "content_type"
         }
     }
-    
+
     enum CodingKeys: String, CodingKey {
         case id
         case tagName = "tag_name"
@@ -57,7 +57,7 @@ class UpdatePreferences: ObservableObject {
     init() {}
 
     @AppStorage("ignoredVersion") private var ignoredVersionData: Data = .init()
-    
+
     // 获取忽略的版本列表
     var ignoredVersions: [String] {
         get {
@@ -75,7 +75,7 @@ class UpdatePreferences: ObservableObject {
             }
         }
     }
-    
+
     // 忽略特定版本
     func ignoreVersion(_ version: String) {
         var ignored = ignoredVersions
@@ -84,7 +84,7 @@ class UpdatePreferences: ObservableObject {
             ignoredVersions = ignored
         }
     }
-    
+
     // 检查版本是否被忽略
     func isVersionIgnored(_ version: String) -> Bool {
         ignoredVersions.contains(version)
@@ -105,60 +105,110 @@ enum UpdateCheckResult {
     case failed(String)
 }
 
+enum GitHubAPIError: LocalizedError {
+    case rateLimited
+    case serverError(statusCode: Int)
+
+    var errorDescription: String? {
+        switch self {
+        case .rateLimited:
+            return AppLocalization.localized("GitHub API rate limit exceeded. Please try again later.")
+        case .serverError(let statusCode):
+            return String(format: AppLocalization.localized("Server response error (%d)"), statusCode)
+        }
+    }
+}
+
 class GitHubReleaseChecker {
     private let owner: String
     private let repo: String
-    
+
     init(owner: String, repo: String) {
         self.owner = owner
         self.repo = repo
     }
-    
-    // 获取最新release
-    func fetchLatestRelease() async throws -> GitHubRelease {
+
+    // 获取最新release。若仓库尚未发布任何 Release（404），返回 nil
+    func fetchLatestRelease() async throws -> GitHubRelease? {
         let url = URL(string: "https://api.github.com/repos/\(owner)/\(repo)/releases/latest")!
-        print(url)
         var request = URLRequest(url: url)
         request.setValue("application/vnd.github.v3+json", forHTTPHeaderField: "Accept")
-        
+
         let (data, response) = try await URLSession.shared.data(for: request)
-        
-        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+
+        guard let httpResponse = response as? HTTPURLResponse else {
             throw URLError(.badServerResponse)
         }
-        
+
+        if httpResponse.statusCode == 404 {
+            // 仓库暂无已发布的 Release
+            return nil
+        }
+
+        if httpResponse.statusCode == 403 {
+            throw GitHubAPIError.rateLimited
+        }
+
+        guard httpResponse.statusCode == 200 else {
+            throw GitHubAPIError.serverError(statusCode: httpResponse.statusCode)
+        }
+
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
         return try decoder.decode(GitHubRelease.self, from: data)
     }
 
-    /// 拉仓库的星标数。走 `/repos/{owner}/{repo}`，和 release 是两个端点。
+    /// 拉仓库的星标数。优先调用 API，若遇限流（403）或异常则抓取公开仓库页提取，确保高可用。
     func fetchStarCount() async throws -> Int {
         let url = URL(string: "https://api.github.com/repos/\(owner)/\(repo)")!
         var request = URLRequest(url: url)
         request.setValue("application/vnd.github.v3+json", forHTTPHeaderField: "Accept")
 
-        let (data, response) = try await URLSession.shared.data(for: request)
+        if let (data, response) = try? await URLSession.shared.data(for: request),
+           let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 {
+            struct Repository: Decodable {
+                let stargazersCount: Int
+                enum CodingKeys: String, CodingKey { case stargazersCount = "stargazers_count" }
+            }
+            if let count = try? JSONDecoder().decode(Repository.self, from: data).stargazersCount {
+                return count
+            }
+        }
 
-        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+        // 备用兜底策略：抓取公共主页提取星标
+        return try await fetchStarCountFromWeb()
+    }
+
+    private func fetchStarCountFromWeb() async throws -> Int {
+        let pageURL = URL(string: "https://github.com/\(owner)/\(repo)")!
+        var request = URLRequest(url: pageURL)
+        request.setValue("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko)", forHTTPHeaderField: "User-Agent")
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200,
+              let html = String(data: data, encoding: .utf8) else {
             throw URLError(.badServerResponse)
         }
 
-        struct Repository: Decodable {
-            let stargazersCount: Int
-            enum CodingKeys: String, CodingKey { case stargazersCount = "stargazers_count" }
+        let pattern = #"<strong>([0-9,]+)</strong>\s*star"#
+        if let regex = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive),
+           let match = regex.firstMatch(in: html, range: NSRange(html.startIndex..., in: html)),
+           let range = Range(match.range(at: 1), in: html) {
+            let numStr = html[range].replacingOccurrences(of: ",", with: "")
+            if let count = Int(numStr) {
+                return count
+            }
         }
-        return try JSONDecoder().decode(Repository.self, from: data).stargazersCount
+        throw URLError(.cannotParseResponse)
     }
 
     // 检查是否需要更新。
-    // 返回枚举而不是 `GitHubRelease?`：那个 `nil` 原来同时背着「网络失败」
-    // 「最新 release 是草稿或预发布」「确实已是最新」三种含义，而 `catch` 又把
-    // 真实的网络错误吞成一句 `print`，上层只能一律当成「已是最新」——
-    // 于是断网会被报成「已是最新」。三种情况分开，界面才可能说实话。
     func checkForUpdate(currentVersion: String, includePrereleases: Bool = false) async -> UpdateCheckResult {
         do {
-            let latestRelease = try await fetchLatestRelease()
+            guard let latestRelease = try await fetchLatestRelease() else {
+                // 暂无任何 Release 发布，当前开发版本即最新
+                return .upToDate
+            }
 
             // 草稿版和预发布版不算可更新版本，但这是一次成功的检查
             if latestRelease.draft || (!includePrereleases && latestRelease.prerelease) {
@@ -174,16 +224,16 @@ class GitHubReleaseChecker {
             return .failed(error.localizedDescription)
         }
     }
-    
+
     // 语义化版本比较
     private func compareVersions(_ version1: String, _ version2: String) -> ComparisonResult {
         let components1 = version1.components(separatedBy: ".")
         let components2 = version2.components(separatedBy: ".")
-        
+
         for i in 0 ..< max(components1.count, components2.count) {
             let part1 = i < components1.count ? components1[i] : "0"
             let part2 = i < components2.count ? components2[i] : "0"
-            
+
             if let num1 = Int(part1), let num2 = Int(part2) {
                 if num1 < num2 { return .orderedAscending }
                 if num1 > num2 { return .orderedDescending }
@@ -195,7 +245,7 @@ class GitHubReleaseChecker {
                 }
             }
         }
-        
+
         return .orderedSame
     }
 }
@@ -204,13 +254,16 @@ class GitHubReleaseChecker {
 
 @MainActor
 class UpdateManager: ObservableObject {
+    static let shared = UpdateManager(
+        owner: "Cute-chen",
+        repo: "RClickX",
+        currentVersion: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0.0"
+    )
+
     @Published var availableUpdate: GitHubRelease?
     @Published var isChecking = false
     @Published var updateError: String?
     /// 上一次检查的结论是「已是最新」。
-    ///
-    /// 单独一个字段，不再借用 `updateError`：借用会让界面无法区分「检查成功且已是最新」
-    /// 和「检查失败」，弹窗里那张绿色「Up to Date」卡片也因此永远走不到。
     @Published var isUpToDate = false
     @Published var isDownloading = false
     @Published var downloadProgress: Double = 0
@@ -218,7 +271,7 @@ class UpdateManager: ObservableObject {
 
     /// 仓库星标数。nil 表示还没拿到——界面就不显示数字，不占位、不报错。
     @Published private(set) var starCount: Int?
-    
+
     private let githubChecker: GitHubReleaseChecker
     private let preferences: UpdatePreferences
     private let currentVersion: String
@@ -227,7 +280,6 @@ class UpdateManager: ObservableObject {
     private let repo: String
 
     /// 是否来自 Mac App Store（通过 `Contents/_MASReceipt/receipt` 是否存在判断）。
-    /// App Store 构建禁止自更新（MAS 审核要求），改为引导用户去 App Store 更新。
     private var isAppStoreBuild: Bool {
         let receiptPath = Bundle.main.bundlePath + "/Contents/_MASReceipt/receipt"
         return FileManager.default.fileExists(atPath: receiptPath)
@@ -246,21 +298,21 @@ class UpdateManager: ObservableObject {
     private enum StarCache {
         static let count = "githubStarCount"
         static let fetchedAt = "githubStarCountFetchedAt"
-        /// 一天拉一次。星数不是实时指标，没必要每次打开「关于」都请求一次。
-        static let lifetime: TimeInterval = 24 * 60 * 60
+        /// 缓存 15 分钟，兼顾时效性与 API 调用频次。
+        static let lifetime: TimeInterval = 15 * 60
     }
 
-    /// 取星标数：优先用缓存，过期或没有才请求。
-    ///
-    /// 失败不打扰用户——有旧值就继续用（别让数字忽然消失），没有就保持 nil，
-    /// 「关于」页那一行只会少一个数字，不会多一条错误。
-    func loadStarCount() async {
+    /// 取星标数：优先显示本地缓存，过期或手动强制时拉取最新值更新。
+    func loadStarCount(force: Bool = false) async {
         let defaults = UserDefaults.group
         let cachedAt = defaults.object(forKey: StarCache.fetchedAt) as? Date
         let cached = defaults.object(forKey: StarCache.count) as? Int
 
-        if let cachedAt, let cached, Date().timeIntervalSince(cachedAt) < StarCache.lifetime {
+        if let cached {
             starCount = cached
+        }
+
+        if !force, let cachedAt, Date().timeIntervalSince(cachedAt) < StarCache.lifetime, cached != nil {
             return
         }
 
@@ -268,11 +320,9 @@ class UpdateManager: ObservableObject {
             starCount = fresh
             defaults.set(fresh, forKey: StarCache.count)
             defaults.set(Date(), forKey: StarCache.fetchedAt)
-        } else if let cached {
-            starCount = cached
         }
     }
-    
+
     // 关闭更新提示。
     // 只关窗，**不清空检查结果**：清空会让「关于」页的状态行在关窗后退回「尚未检查」，
     // 把用户刚拿到的信息抹掉；再用「查看详情…」打开时也会看到一张空白的卡片。
@@ -284,13 +334,17 @@ class UpdateManager: ObservableObject {
     func showUpdateDetails() {
         showUpdateSheet = true
     }
-      
+
     // 检查更新
     func checkForUpdates(force: Bool = false) async {
         isChecking = true
         updateError = nil
         isUpToDate = false
         showUpdateSheet = true
+
+        if force {
+            Task { await loadStarCount(force: true) }
+        }
 
         defer { isChecking = false }
 
@@ -313,7 +367,7 @@ class UpdateManager: ObservableObject {
             availableUpdate = release
         }
     }
-    
+
     // MARK: - 下载和安装方法
 
     func downloadAndInstallUpdate() async {
@@ -330,38 +384,38 @@ class UpdateManager: ObservableObject {
             print("没有可用的更新")
             return
         }
-        
+
         // 查找 .app.zip 附件
         guard let appZipAsset = release.assets.first(where: { $0.name.lowercased().hasSuffix(".app.zip") }) else {
             updateError = AppLocalization.localized("No .app.zip application package was found.")
             print("没有可用的更新")
             return
         }
-        
+
         isDownloading = true
         downloadProgress = 0
-        
+
         do {
             // 1. 下载 ZIP 文件
             let downloadedURL = try await downloadAsset(asset: appZipAsset)
-            
+
             // 2. 解压到临时目录
             let appURL = try await extractAppZip(zipURL: downloadedURL)
-            
+
             // 3. 安装应用到应用程序目录
             try await installApplication(appURL: appURL)
-            
+
             // 4. 清理临时文件
             try? FileManager.default.removeItem(at: downloadedURL)
             try? FileManager.default.removeItem(at: appURL.deletingLastPathComponent())
-            
+
             // 5. 提示用户安装完成
             showInstallationCompleteAlert()
-            
+
         } catch {
             updateError = String(format: AppLocalization.localized("Installation failed: %@"), error.localizedDescription)
         }
-        
+
         isDownloading = false
     }
 
@@ -369,12 +423,12 @@ class UpdateManager: ObservableObject {
         print("start downloadAsset:\(asset.browserDownloadUrl)")
         let tempDir = FileManager.default.temporaryDirectory
         let downloadURL = tempDir.appendingPathComponent(asset.name)
-        
+
         var request = URLRequest(url: URL(string: asset.browserDownloadUrl)!)
         request.setValue("application/octet-stream", forHTTPHeaderField: "Accept")
-        
+
         let downloadFailedMessage = AppLocalization.localized("Download failed")
-        
+
         // 使用 AsyncThrowingStream 来包装下载进度和结果
         return try await withCheckedThrowingContinuation { continuation in
             // Stream bytes and write to destination file
@@ -420,37 +474,37 @@ class UpdateManager: ObservableObject {
     private func extractAppZip(zipURL: URL) async throws -> URL {
         let tempDir = FileManager.default.temporaryDirectory
         let extractionDir = tempDir.appendingPathComponent("app_extraction")
-        
+
         // 创建解压目录
         try FileManager.default.createDirectory(at: extractionDir, withIntermediateDirectories: true)
-        
+
         // 使用系统命令解压
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/unzip")
         process.arguments = ["-o", zipURL.path, "-d", extractionDir.path]
-        
+
         let outputPipe = Pipe()
         let errorPipe = Pipe()
         process.standardOutput = outputPipe
         process.standardError = errorPipe
-        
+
         try process.run()
         process.waitUntilExit()
-        
+
         guard process.terminationStatus == 0 else {
             let errorData = errorPipe.fileHandleForReading.readDataToEndOfFile()
             let errorString = String(data: errorData, encoding: .utf8) ?? AppLocalization.localized("Unknown error")
             throw InstallationError.zipExtractionFailed(String(format: AppLocalization.localized("Extraction failed: %@"), errorString))
         }
-        
+
         // 查找解压后的 .app 文件
         let fileManager = FileManager.default
         let contents = try fileManager.contentsOfDirectory(at: extractionDir, includingPropertiesForKeys: nil)
-        
+
         guard let appURL = contents.first(where: { $0.pathExtension == "app" }) else {
             throw InstallationError.noAppFound(AppLocalization.localized("No .app application was found in the ZIP file."))
         }
-        
+
         return appURL
     }
 
@@ -466,7 +520,7 @@ class UpdateManager: ObservableObject {
         openPanel.directoryURL = FileManager.default.urls(for: .applicationDirectory, in: .localDomainMask).first
 
         let response = await openPanel.begin()
-        
+
         guard response == .OK, let selectedURL = openPanel.url else {
             throw InstallationError.permissionDenied(AppLocalization.localized("The user cancelled authorization."))
         }
@@ -495,10 +549,10 @@ class UpdateManager: ObservableObject {
                 // 先尝试移动到废纸篓而不是直接删除
                 try fileManager.trashItem(at: destinationAppURL, resultingItemURL: nil)
             }
-            
+
             // 复制应用到应用程序目录
             try fileManager.copyItem(at: appURL, to: destinationAppURL)
-            
+
             // 验证应用程序是否有效
             guard Bundle(url: destinationAppURL) != nil else {
 //                try fileManager.removeItem(at: destinationAppURL)
@@ -507,7 +561,7 @@ class UpdateManager: ObservableObject {
         } catch {
             print("❌ 安装失败: \(error)")
         }
-        
+
     }
 
     // MARK: - App Store 更新引导
@@ -532,7 +586,7 @@ class UpdateManager: ObservableObject {
         alert.informativeText = AppLocalization.localized("The application has been updated successfully. Restart the app to finish the update.")
         alert.addButton(withTitle: AppLocalization.localized("Restart Now"))
         alert.addButton(withTitle: AppLocalization.localized("Restart Later"))
-        
+
         let response = alert.runModal()
         if response == .alertFirstButtonReturn {
             // 启动新应用并退出当前应用
@@ -547,7 +601,7 @@ class UpdateManager: ObservableObject {
         let applicationsURL = fileManager.urls(for: .applicationDirectory, in: .localDomainMask).first!
         let currentAppName = Bundle.main.object(forInfoDictionaryKey: "CFBundleName") as? String ?? "RClick"
         let newAppURL = applicationsURL.appendingPathComponent("\(currentAppName).app")
-        
+
         let configuration = NSWorkspace.OpenConfiguration()
         NSWorkspace.shared.openApplication(at: newAppURL, configuration: configuration) { _, error in
             if error != nil {
@@ -567,7 +621,7 @@ class UpdateManager: ObservableObject {
             availableUpdate = nil
         }
     }
-    
+
     /// 统一的仓库地址拼接：owner/repo 来自 init，不在各处再硬编码一遍。
     private func openGitHub(_ path: String = "") {
         guard let url = URL(string: "https://github.com/\(owner)/\(repo)\(path)") else { return }
@@ -582,12 +636,12 @@ class UpdateManager: ObservableObject {
 
     /// 打开 Issues 列表（「关于」页的「反馈问题」走这里）。
     func openIssuesPage() { openGitHub("/issues") }
-    
+
     // MARK: - 错误类型
 
     enum DownloadError: LocalizedError {
         case downloadFailed(String)
-        
+
         var errorDescription: String? {
             switch self {
             case .downloadFailed(let message):
@@ -601,7 +655,7 @@ class UpdateManager: ObservableObject {
         case noAppFound(String)
         case invalidAppBundle(String)
         case permissionDenied(String)
-        
+
         var errorDescription: String? {
             switch self {
             case .zipExtractionFailed(let message):

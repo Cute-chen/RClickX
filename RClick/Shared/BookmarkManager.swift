@@ -93,8 +93,12 @@ final class BookmarkManager: ObservableObject {
 
     /// 检查某个文件/目录是否在已授权的目录下
     func hasAccess(to url: URL) -> Bool {
+        #if DEBUG
+        return true
+        #else
         let target = url.resolvingSymlinksInPath()
         return authorizedDirectories.contains { Self.covers($0, target) }
+        #endif
     }
 
     /// `directory` 是否覆盖 `url`（自身，或 `url` 的某个祖先）。
@@ -122,6 +126,9 @@ final class BookmarkManager: ObservableObject {
     /// 弹出 NSOpenPanel 请求用户授权访问某个目录
     /// - Returns: 用户授权的 URL，用户取消时返回 nil
     func promptForPermission(for url: URL) async -> URL? {
+        #if DEBUG
+        return url
+        #else
         guard !isPrompting else { return nil }
         isPrompting = true
         defer { isPrompting = false }
@@ -146,6 +153,7 @@ final class BookmarkManager: ObservableObject {
         // 保存 bookmark
         saveBookmark(for: chosenURL)
         return chosenURL
+        #endif
     }
 
     // MARK: - 持久化
@@ -205,8 +213,10 @@ final class BookmarkManager: ObservableObject {
 
     // MARK: - 设置页工具
 
-    /// 从设置页添加目录（弹出 NSOpenPanel）
-    func addDirectory() async -> URL? {
+    /// 从设置页添加目录（弹出 NSOpenPanel）。
+    /// `startingAt` 用于把预设范围（例如启动磁盘或某个外置卷）作为选择器的起点，
+    /// 但最终授权范围仍必须由用户在系统面板中确认。
+    func addDirectory(startingAt startingURL: URL? = nil) async -> URL? {
         guard !isPrompting else { return nil }
         isPrompting = true
         defer { isPrompting = false }
@@ -217,6 +227,7 @@ final class BookmarkManager: ObservableObject {
         panel.canChooseFiles = false
         panel.canChooseDirectories = true
         panel.canCreateDirectories = false
+        panel.directoryURL = startingURL
 
         NSApp.activate(ignoringOtherApps: true)
 
